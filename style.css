@@ -26,7 +26,7 @@ body {
   font-size: 14px;
   color: var(--ink);
   background: #000;
-  padding: 18px;
+  padding: 16px;
 }
 
 body::before {
@@ -62,13 +62,13 @@ body::after {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin: 0 auto 12px;
-  max-width: 1840px;
-  padding: 12px 14px;
-  border: 1px solid rgba(158, 181, 215, 0.14);
+  margin: 0 auto 10px;
+  max-width: 1720px;
+  padding: 12px 16px;
+  border: 1px solid rgba(158, 181, 215, 0.16);
   border-radius: 8px;
-  background: rgba(11, 22, 38, 0.72);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+  background: rgba(10, 19, 33, 0.92);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.32);
 }
 
 h1 {
@@ -130,7 +130,7 @@ h1 {
   display: flex;
   gap: 10px;
   overflow-x: auto;
-  max-width: 1840px;
+  max-width: 1720px;
   margin: 0 auto;
   padding: 0 0 12px;
 }
@@ -156,10 +156,10 @@ h1 {
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(270px, 320px) minmax(360px, 0.95fr) minmax(430px, 1.15fr) minmax(250px, 310px);
-  gap: 14px;
+  grid-template-columns: minmax(260px, 300px) minmax(360px, 500px) minmax(460px, 1.15fr) minmax(250px, 300px);
+  gap: 12px;
   align-items: start;
-  max-width: 1840px;
+  max-width: 1720px;
   min-height: calc(100vh - 152px);
   margin: 0 auto;
 }
@@ -167,14 +167,14 @@ h1 {
 .panel,
 .card {
   background:
-    linear-gradient(180deg, rgba(19, 34, 55, 0.94), rgba(11, 22, 38, 0.94));
-  border: 1px solid var(--border);
+    linear-gradient(180deg, rgba(16, 29, 48, 0.97), rgba(8, 17, 31, 0.97));
+  border: 1px solid rgba(158, 181, 215, 0.18);
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(10px);
 }
 
-.panel { padding: 14px; min-width: 0; min-height: 0; }
+.panel { padding: 13px; min-width: 0; min-height: 0; }
 
 .panel-head {
   display: flex;
@@ -273,7 +273,7 @@ select {
 }
 
 .pitch {
-  width: min(100%, 560px);
+  width: min(100%, 520px);
   height: auto;
   max-width: 100%;
   margin: 0 auto;
@@ -291,8 +291,8 @@ select {
 .legend {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px 10px;
-  margin-top: 12px;
+  gap: 7px 10px;
+  margin-top: 10px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -325,7 +325,7 @@ select {
   width: 100%;
   flex: 0 0 auto;
   aspect-ratio: 764 / 280;
-  min-height: 0;
+  min-height: 176px;
   max-height: none;
   display: block;
   border-radius: 8px;
@@ -340,8 +340,8 @@ select {
 .psxg-controls-2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 170px;
-  gap: 14px;
-  margin-top: 14px;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 input[type=range] {
@@ -403,13 +403,13 @@ input[type=range] {
 .metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .metrics .m {
   min-width: 0;
-  padding: 11px 8px;
+  padding: 10px 8px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--panel-2);
@@ -433,13 +433,13 @@ input[type=range] {
 .cards {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
   min-width: 0;
   overflow: visible;
 }
 
 .card {
-  padding: 14px;
+  padding: 13px;
   box-shadow: none;
 }
 
@@ -501,8 +501,8 @@ input[type=range] {
 }
 
 .breakdown-panel {
-  margin-top: 14px;
-  padding: 13px;
+  margin-top: 12px;
+  padding: 12px;
   border: 1px solid rgba(53, 194, 255, 0.22);
   border-radius: 8px;
   background:
@@ -512,21 +512,23 @@ input[type=range] {
 
 .formula-panel {
   margin-bottom: 11px;
-  padding: 11px;
+  padding: 10px;
   border: 1px solid rgba(77, 174, 111, 0.28);
   border-radius: 8px;
   background: rgba(77, 174, 111, 0.08);
 }
 
 .psxg-formula-panel {
-  border-color: rgba(53, 194, 255, 0.3);
+  border: 1px solid rgba(53, 194, 255, 0.24);
+  border-radius: 8px;
   background:
-    linear-gradient(140deg, rgba(53, 194, 255, 0.12), transparent 72%),
-    rgba(53, 194, 255, 0.06);
+    linear-gradient(140deg, rgba(53, 194, 255, 0.08), transparent 72%),
+    rgba(8, 18, 32, 0.76);
 }
 
 .psxg-formula-card {
-  margin: 0;
+  margin: 12px 0 0;
+  padding: 11px;
 }
 
 .psxg-formula-panel .formula-title {
@@ -534,7 +536,7 @@ input[type=range] {
 }
 
 .formula-title {
-  margin-bottom: 7px;
+  margin-bottom: 8px;
   color: #d9ffe5;
   font-size: 15px;
   font-weight: 950;
@@ -542,11 +544,11 @@ input[type=range] {
 }
 
 .psxg-formula-card .formula-title {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .formula-line {
-  margin-top: 7px;
+  margin-top: 6px;
   color: var(--ink);
   font-size: 12px;
   font-weight: 900;
@@ -595,6 +597,7 @@ input[type=range] {
 
 .psxg-formula-card .formula-live {
   grid-template-columns: 1fr;
+  padding-top: 9px;
 }
 
 .psxg-formula-card .formula-live b {
@@ -788,7 +791,7 @@ input[type=range] {
 
 @media (max-width: 1450px) {
   .grid {
-    grid-template-columns: minmax(250px, 300px) minmax(340px, 1fr) minmax(390px, 1.1fr);
+    grid-template-columns: minmax(250px, 300px) minmax(340px, 0.95fr) minmax(460px, 1.25fr);
     grid-template-areas:
       "controls pitch psxg"
       "controls pitch cards";
@@ -860,7 +863,7 @@ input[type=range] {
   body { padding: 12px; }
   .metrics { grid-template-columns: repeat(3, 1fr); }
   .pitch { width: 100%; height: auto; }
-  .goalframe { min-height: 0; aspect-ratio: 788 / 296; }
+  .goalframe { min-height: 164px; aspect-ratio: 788 / 296; }
 }
 
 @media (max-width: 560px) {

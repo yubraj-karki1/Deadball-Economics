@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Deadball Economics - Set-piece xG</title>
-  <link rel="stylesheet" href="/style.css?v=black-bg-psxg-card-1" />
+  <link rel="stylesheet" href="/style.css?v=clean-dashboard-1" />
 </head>
 <body>
   <header class="topbar">
@@ -115,6 +115,16 @@
         <span><i class="dot atk"></i> Attackers</span>
         <span><i class="dot wall-dot"></i> Wall</span>
       </div>
+      <div class="psxg-formula-card psxg-formula-panel">
+        <div class="formula-title">PSxG formula explanation</div>
+        <div class="formula-line"><code>speed_mps = shot_speed / 3.6</code></div>
+        <div class="formula-line"><code>ball_time = shot_distance / speed_mps</code></div>
+        <div class="formula-line"><code>GK_dive = sqrt(dx^2 + dy^2)</code></div>
+        <div class="formula-line"><code>GK_reach = reaction + max(dx / GK_H, dy / GK_V)</code></div>
+        <div class="formula-line"><code>margin = GK_reach - ball_time</code></div>
+        <p>PSxG rises when the ball reaches a difficult target faster than the goalkeeper can react and cover the horizontal or vertical distance.</p>
+        <div class="formula-live" id="psxgFormulaLive">Move the goal-frame ball or keeper to calculate PSxG.</div>
+      </div>
     </section>
 
     <section class="panel psxgpanel">
@@ -169,16 +179,6 @@
         <div class="k">Combined (xG &times; PSxG)</div>
         <div class="v mid" id="combined">&mdash;</div>
         <div class="note" id="psxgNote">PSxG = &mdash; (physics)</div>
-      </div>
-      <div class="card small psxg-formula-card psxg-formula-panel">
-        <div class="formula-title">PSxG formula explanation</div>
-        <div class="formula-line"><code>speed_mps = shot_speed / 3.6</code></div>
-        <div class="formula-line"><code>ball_time = shot_distance / speed_mps</code></div>
-        <div class="formula-line"><code>GK_dive = sqrt(dx^2 + dy^2)</code></div>
-        <div class="formula-line"><code>GK_reach = reaction + max(dx / GK_H, dy / GK_V)</code></div>
-        <div class="formula-line"><code>margin = GK_reach - ball_time</code></div>
-        <p>PSxG rises when the ball reaches a difficult target faster than the goalkeeper can react and cover the horizontal or vertical distance.</p>
-        <div class="formula-live" id="psxgFormulaLive">Move the goal-frame ball or keeper to calculate PSxG.</div>
       </div>
       <div class="card small">
         <div class="row"><span>Zone</span><b id="zone">&mdash;</b></div>
