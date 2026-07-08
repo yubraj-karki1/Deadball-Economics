@@ -1,18 +1,18 @@
 :root {
-  --bg: #07111f;
-  --ink: #f8fbff;
-  --muted: #9eb5d7;
-  --panel: #101a2b;
-  --panel-2: #0b1424;
-  --border: #263956;
-  --line: rgba(158, 181, 215, 0.16);
-  --green: #4dae6f;
-  --deep: #35c2ff;
+  --bg: #10130f;
+  --ink: #fbfaf5;
+  --muted: #b8c6bd;
+  --panel: #1b211c;
+  --panel-2: #121812;
+  --border: #344234;
+  --line: rgba(184, 198, 189, 0.17);
+  --green: #55c47a;
+  --deep: #42d6c6;
   --lime: #c7f464;
   --blue: #2563eb;
   --red: #dc2626;
-  --gold: #f5b83d;
-  --shadow: 0 22px 70px rgba(0, 0, 0, 0.34);
+  --gold: #f2b950;
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.38);
 }
 
 * { box-sizing: border-box; }
@@ -26,11 +26,11 @@ body {
   font-size: 14px;
   color: var(--ink);
   background:
-    linear-gradient(180deg, rgba(116, 205, 255, 0.12) 0, rgba(7, 17, 31, 0) 210px),
-    linear-gradient(115deg, rgba(20, 104, 66, 0.32) 0 18%, transparent 18% 100%),
-    linear-gradient(245deg, rgba(53, 194, 255, 0.12) 0 16%, transparent 16% 100%),
-    repeating-linear-gradient(90deg, rgba(61, 147, 90, 0.12) 0 78px, rgba(18, 67, 48, 0.12) 78px 156px),
-    linear-gradient(180deg, #0c1c2d 0, #07111f 46%, #050b14 100%),
+    linear-gradient(180deg, rgba(242, 185, 80, 0.11) 0, rgba(16, 19, 15, 0) 230px),
+    linear-gradient(118deg, rgba(45, 122, 69, 0.32) 0 22%, transparent 22% 100%),
+    linear-gradient(245deg, rgba(66, 214, 198, 0.13) 0 16%, transparent 16% 100%),
+    repeating-linear-gradient(90deg, rgba(58, 118, 69, 0.16) 0 82px, rgba(28, 59, 40, 0.15) 82px 164px),
+    linear-gradient(180deg, #192316 0, #10130f 48%, #090b08 100%),
     var(--bg);
   padding: 18px;
 }
@@ -41,9 +41,9 @@ body::before {
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(185, 219, 255, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(185, 219, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(115deg, transparent 0 47%, rgba(84, 255, 169, 0.07) 47% 47.3%, transparent 47.3% 100%);
+    linear-gradient(rgba(246, 236, 207, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(246, 236, 207, 0.04) 1px, transparent 1px),
+    linear-gradient(115deg, transparent 0 47%, rgba(66, 214, 198, 0.08) 47% 47.3%, transparent 47.3% 100%);
   background-size: 42px 42px, 42px 42px, 100% 100%;
   mask-image: linear-gradient(180deg, rgba(0,0,0,0.95), rgba(0,0,0,0.25));
 }
@@ -54,7 +54,7 @@ body::after {
   inset: 0;
   pointer-events: none;
   background:
-    linear-gradient(90deg, rgba(7, 17, 31, 0.88), transparent 18%, transparent 82%, rgba(7, 17, 31, 0.88)),
+    linear-gradient(90deg, rgba(16, 19, 15, 0.88), transparent 18%, transparent 82%, rgba(16, 19, 15, 0.88)),
     linear-gradient(180deg, transparent 0, rgba(0, 0, 0, 0.26) 100%);
 }
 
@@ -78,9 +78,11 @@ body::after {
   margin: 0 auto 12px;
   max-width: 1840px;
   padding: 12px 14px;
-  border: 1px solid rgba(158, 181, 215, 0.14);
+  border: 1px solid rgba(242, 185, 80, 0.18);
   border-radius: 8px;
-  background: rgba(11, 22, 38, 0.72);
+  background:
+    linear-gradient(135deg, rgba(66, 214, 198, 0.08), transparent 42%),
+    rgba(22, 28, 21, 0.78);
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
 }
 
@@ -129,7 +131,7 @@ h1 {
   padding: 0 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(18, 34, 56, 0.9), rgba(10, 21, 37, 0.9));
+  background: linear-gradient(180deg, rgba(32, 43, 33, 0.94), rgba(17, 25, 18, 0.94));
   color: var(--ink);
   text-decoration: none;
   font-size: 12px;
@@ -154,7 +156,7 @@ h1 {
   padding: 0 16px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(16, 32, 54, 0.95), rgba(10, 20, 36, 0.95));
+  background: linear-gradient(180deg, rgba(33, 45, 35, 0.95), rgba(18, 27, 20, 0.95));
   color: var(--ink);
   font-weight: 800;
   cursor: pointer;
@@ -180,7 +182,7 @@ h1 {
 .panel,
 .card {
   background:
-    linear-gradient(180deg, rgba(19, 34, 55, 0.94), rgba(11, 22, 38, 0.94));
+    linear-gradient(180deg, rgba(31, 40, 32, 0.95), rgba(17, 25, 18, 0.95));
   border: 1px solid var(--border);
   border-radius: 8px;
   box-shadow: var(--shadow);
@@ -271,7 +273,7 @@ select {
   justify-content: space-between;
   padding: 11px;
   border-radius: 8px;
-  background: rgba(53, 194, 255, 0.08);
+  background: rgba(66, 214, 198, 0.09);
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -458,9 +460,9 @@ input[type=range] {
 
 .card.big {
   background:
-    linear-gradient(140deg, rgba(53, 194, 255, 0.24), transparent 56%),
-    linear-gradient(180deg, rgba(20, 39, 63, 0.96), rgba(9, 19, 35, 0.96));
-  border-color: rgba(53, 194, 255, 0.35);
+    linear-gradient(140deg, rgba(66, 214, 198, 0.26), transparent 55%),
+    linear-gradient(180deg, rgba(34, 48, 36, 0.97), rgba(15, 24, 17, 0.97));
+  border-color: rgba(66, 214, 198, 0.38);
 }
 
 .card .k {
@@ -516,11 +518,11 @@ input[type=range] {
 .breakdown-panel {
   margin-top: 14px;
   padding: 13px;
-  border: 1px solid rgba(53, 194, 255, 0.22);
+  border: 1px solid rgba(66, 214, 198, 0.24);
   border-radius: 8px;
   background:
-    linear-gradient(140deg, rgba(53, 194, 255, 0.09), transparent 58%),
-    rgba(11, 20, 36, 0.84);
+    linear-gradient(140deg, rgba(66, 214, 198, 0.1), transparent 58%),
+    rgba(18, 25, 19, 0.86);
 }
 
 .formula-panel {
@@ -532,14 +534,14 @@ input[type=range] {
 }
 
 .psxg-formula-panel {
-  border-color: rgba(53, 194, 255, 0.3);
+  border-color: rgba(66, 214, 198, 0.34);
   background:
-    linear-gradient(140deg, rgba(53, 194, 255, 0.12), transparent 72%),
-    rgba(53, 194, 255, 0.06);
+    linear-gradient(140deg, rgba(66, 214, 198, 0.13), transparent 72%),
+    rgba(66, 214, 198, 0.06);
 }
 
 .psxg-formula-panel .formula-title {
-  color: #bfeeff;
+  color: #c7fff7;
 }
 
 .formula-title {
@@ -645,7 +647,7 @@ input[type=range] {
   max-height: min(72vh, 620px);
   overflow: auto;
   margin-top: 0;
-  background: rgba(16, 26, 43, 0.94);
+  background: rgba(24, 32, 25, 0.95);
   transform: translateY(calc(100% + 28px));
   opacity: 0;
   pointer-events: none;
@@ -667,7 +669,7 @@ input[type=range] {
   top: -12px;
   z-index: 2;
   padding: 4px 0 10px;
-  background: linear-gradient(180deg, rgba(16, 26, 43, 0.98), rgba(16, 26, 43, 0.9));
+  background: linear-gradient(180deg, rgba(24, 32, 25, 0.98), rgba(24, 32, 25, 0.9));
 }
 
 .validate h2 {
@@ -732,7 +734,7 @@ input[type=range] {
 }
 
 .val-table tbody tr:first-child {
-  background: rgba(53, 194, 255, 0.08);
+  background: rgba(66, 214, 198, 0.09);
   font-weight: 900;
 }
 
