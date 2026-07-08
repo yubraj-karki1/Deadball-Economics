@@ -496,7 +496,7 @@ input[type=range] {
 
 .bk-title {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 950;
 }
 
@@ -536,9 +536,13 @@ input[type=range] {
 .formula-title {
   margin-bottom: 7px;
   color: #d9ffe5;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 950;
   text-transform: uppercase;
+}
+
+.psxg-formula-card .formula-title {
+  font-size: 16px;
 }
 
 .formula-line {
