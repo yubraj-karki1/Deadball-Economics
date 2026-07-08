@@ -25,13 +25,7 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   font-size: 14px;
   color: var(--ink);
-  background:
-    linear-gradient(180deg, rgba(116, 205, 255, 0.12) 0, rgba(7, 17, 31, 0) 210px),
-    linear-gradient(115deg, rgba(20, 104, 66, 0.32) 0 18%, transparent 18% 100%),
-    linear-gradient(245deg, rgba(53, 194, 255, 0.12) 0 16%, transparent 16% 100%),
-    repeating-linear-gradient(90deg, rgba(61, 147, 90, 0.12) 0 78px, rgba(18, 67, 48, 0.12) 78px 156px),
-    linear-gradient(180deg, #0c1c2d 0, #07111f 46%, #050b14 100%),
-    var(--bg);
+  background: #000;
   padding: 18px;
 }
 
@@ -40,12 +34,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background-image:
-    linear-gradient(rgba(185, 219, 255, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(185, 219, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(115deg, transparent 0 47%, rgba(84, 255, 169, 0.07) 47% 47.3%, transparent 47.3% 100%);
-  background-size: 42px 42px, 42px 42px, 100% 100%;
-  mask-image: linear-gradient(180deg, rgba(0,0,0,0.95), rgba(0,0,0,0.25));
+  background: none;
 }
 
 body::after {
@@ -53,9 +42,7 @@ body::after {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background:
-    linear-gradient(90deg, rgba(7, 17, 31, 0.88), transparent 18%, transparent 82%, rgba(7, 17, 31, 0.88)),
-    linear-gradient(180deg, transparent 0, rgba(0, 0, 0, 0.26) 100%);
+  background: none;
 }
 
 .topbar,
@@ -538,6 +525,10 @@ input[type=range] {
     rgba(53, 194, 255, 0.06);
 }
 
+.psxg-formula-card {
+  margin: 0;
+}
+
 .psxg-formula-panel .formula-title {
   color: #bfeeff;
 }
@@ -561,14 +552,16 @@ input[type=range] {
   margin-top: 0;
 }
 
-.formula-panel p {
+.formula-panel p,
+.psxg-formula-card p {
   margin: 5px 0 0;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.45;
 }
 
-.formula-panel code {
+.formula-panel code,
+.psxg-formula-card code {
   border: 1px solid rgba(158, 181, 215, 0.2);
   border-radius: 5px;
   background: rgba(5, 12, 22, 0.56);
@@ -594,6 +587,15 @@ input[type=range] {
   font-weight: 900;
   text-align: right;
   white-space: nowrap;
+}
+
+.psxg-formula-card .formula-live {
+  grid-template-columns: 1fr;
+}
+
+.psxg-formula-card .formula-live b {
+  text-align: left;
+  white-space: normal;
 }
 
 .bk-mods {
