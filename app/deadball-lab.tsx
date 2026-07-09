@@ -671,7 +671,7 @@ export default function DeadballLab() {
               return <g key={`${c}-${r}`}><rect x={16 + c * 183} y={16 + r * 81.33} width="183" height="81.33" fill={zoneFill(v)} stroke="rgba(255,255,255,.25)" /><text x={16 + c * 183 + 91.5} y={16 + r * 81.33 + 44} textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{v.toFixed(2)}</text></g>;
             }))}
             <ellipse cx={gkSvgX} cy={gkSvgY} rx={Math.max(50, (psxg.ballTime - 0.15) * GK_H * 100)} ry={Math.max(50, (psxg.ballTime - 0.15) * GK_V * 100)} fill="rgba(45,212,191,.16)" stroke="rgba(45,212,191,.9)" strokeDasharray="6 4" />
-            <g onPointerDown={() => setGoalDrag("gk")} className="grab"><rect x={gkSvgX - 18} y={gkSvgY - 104} width="36" height="90" rx="10" fill="#ff5a5f" stroke="#fff" /><circle cx={gkSvgX} cy={gkSvgY - 118} r="12" fill="#f0bc8f" stroke="#fff" /><text x={gkSvgX} y={gkSvgY - 60} textAnchor="middle" fill="#fff" fontSize="11" fontWeight="bold">GK</text></g>
+            <GoalkeeperFigure x={gkSvgX} y={gkSvgY} onPointerDown={() => setGoalDrag("gk")} />
             <g onPointerDown={() => setGoalDrag("ball")} className="grab"><circle cx={ballSvgX} cy={ballSvgY} r="16" fill="#fff" stroke="#333" strokeWidth="2" /><text x={ballSvgX} y={ballSvgY + 29} textAnchor="middle" fill="#fff" fontSize="12" fontWeight="bold">BALL</text></g>
           </svg>
           <Slider label="Shot speed" value={state.shotSpeed} min={40} max={140} onChange={(shotSpeed) => update({ shotSpeed })} suffix=" km/h" />
@@ -720,6 +720,24 @@ function Slider({ label, value, min, max, step = 1, suffix = "", onChange }: { l
 
 function Player({ p, color, label, radius = 0.95, onPointerDown }: { p: Point; color: string; label?: string; radius?: number; onPointerDown?: () => void }) {
   return <g onPointerDown={onPointerDown} className={onPointerDown ? "grab" : undefined}><circle cx={p[0]} cy={p[1]} r={radius} fill={color} stroke="#fff9d6" strokeWidth="0.22" />{label && <text x={p[0]} y={p[1] + 0.35} textAnchor="middle" fontSize="0.9" fill="#15200c" fontWeight="bold">{label}</text>}</g>;
+}
+
+function GoalkeeperFigure({ x, y, onPointerDown }: { x: number; y: number; onPointerDown: () => void }) {
+  return (
+    <g onPointerDown={onPointerDown} className="grab">
+      <line x1={x - 14} y1={y - 78} x2={x - 44} y2={y - 50} stroke="#ff5a5f" strokeWidth="11" strokeLinecap="round" />
+      <line x1={x + 14} y1={y - 78} x2={x + 44} y2={y - 50} stroke="#ff5a5f" strokeWidth="11" strokeLinecap="round" />
+      <circle cx={x - 49} cy={y - 46} r="9" fill="#fff" stroke="#17241b" strokeWidth="2" />
+      <circle cx={x + 49} cy={y - 46} r="9" fill="#fff" stroke="#17241b" strokeWidth="2" />
+      <line x1={x - 8} y1={y - 18} x2={x - 24} y2={y + 6} stroke="#17241b" strokeWidth="10" strokeLinecap="round" />
+      <line x1={x + 8} y1={y - 18} x2={x + 24} y2={y + 6} stroke="#17241b" strokeWidth="10" strokeLinecap="round" />
+      <line x1={x - 24} y1={y + 6} x2={x - 38} y2={y + 6} stroke="#fff" strokeWidth="6" strokeLinecap="round" />
+      <line x1={x + 24} y1={y + 6} x2={x + 38} y2={y + 6} stroke="#fff" strokeWidth="6" strokeLinecap="round" />
+      <rect x={x - 18} y={y - 104} width="36" height="90" rx="10" fill="#ff5a5f" stroke="#fff" strokeWidth="2" />
+      <circle cx={x} cy={y - 118} r="12" fill="#f0bc8f" stroke="#fff" strokeWidth="2" />
+      <text x={x} y={y - 60} textAnchor="middle" fill="#fff" fontSize="11" fontWeight="bold">GK</text>
+    </g>
+  );
 }
 
 function PitchMarks() {
