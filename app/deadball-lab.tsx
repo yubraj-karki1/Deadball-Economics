@@ -63,6 +63,7 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 const pct = (v: number | null | undefined) => (v == null || Number.isNaN(v) ? "-" : `${(v * 100).toFixed(1)}%`);
 const distM = (p: Point) => Math.hypot(GX - p[0], GY - p[1]);
 const toSB = (p: Point): Point => [+(p[0] * 120 / P_L).toFixed(2), +(p[1] * 80 / P_W).toFixed(2)];
+const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
 const heatColor = (xg: number) => {
   const t = Math.min(1, xg / 0.35);
   const r = t < 0.5 ? Math.round(80 + 350 * t) : 235;
@@ -202,6 +203,25 @@ function goalPointToSvg([x, y]: Point) {
   return [16 + x * 100, 16 + (GOAL_H - y) * 100] as Point;
 }
 
+function directFreeKickPath(start: Point, target: Point, curve: number, dip: number) {
+  const dx = target[0] - start[0];
+  const dy = target[1] - start[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const nx = -uy;
+  const ny = ux;
+  const bendSide = start[1] < GY ? -1 : 1;
+  const bend = curve / 12;
+
+  const c1x = start[0] + ux * 7;
+  const c1y = start[1] + uy * 7 - dip / 14;
+  const c2x = target[0] - ux * 7 + nx * bend * bendSide;
+  const c2y = target[1] - uy * 7 + ny * bend * bendSide;
+
+  return `M ${start[0]} ${start[1]} C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${target[0]} ${target[1]}`;
+}
+
 export default function DeadballLab() {
   const [state, setState] = useState<LabState>(initialState);
   const [scenarioName, setScenarioName] = useState("Near-post corner");
@@ -217,7 +237,7 @@ export default function DeadballLab() {
   const isFreeKick = state.spType.startsWith("freekick");
   const isCorner = state.spType.startsWith("corner");
   const modelShot = isDirect ? state.start : state.shot;
-  const craftBonus = isDirect ? Math.min(0.18, Math.abs(state.curve) / 100 * 0.055 + state.dip / 100 * 0.045 + state.knuckle / 100 * 0.07) : 0;
+  const craftBonus = isDirect ? Math.min(0.18, state.curve / 100 * 0.055 + state.dip / 100 * 0.045 + state.knuckle / 100 * 0.07) : 0;
   const psxg = useMemo(() => calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus), [state.ball, state.gkf, state.shotSpeed, modelShot, craftBonus]);
   const combined = result ? result.xg * psxg.psxg : null;
   const wallPlayers = useMemo(() => {
@@ -241,32 +261,36 @@ export default function DeadballLab() {
   useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
-      const [shot_x, shot_y] = toSB(modelShot);
-      const payload = {
-        setpiece_type: state.spType,
-        shot_x,
-        shot_y,
-        gk: toSB(state.gk),
-        defenders: [...state.defenders, ...wallPlayers].map(toSB),
-        attackers: state.attackers.map(toSB),
-        delivery_technique: isDirect ? "" : state.swing,
-        delivery_height: isDirect ? "" : state.height,
-        corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
-        body_part: isDirect && state.body === "Head" ? "Right Foot" : state.body,
-        shot_type: isDirect ? "Free Kick" : "",
-      };
-      const res = await fetch("/api/calculate_xg", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-      setResult(await res.json() as XgResponse);
+      try {
+        const [shot_x, shot_y] = toSB(modelShot);
+        const payload = {
+          setpiece_type: state.spType,
+          shot_x,
+          shot_y,
+          gk: toSB(state.gk),
+          defenders: [...state.defenders, ...wallPlayers].map(toSB),
+          attackers: state.attackers.map(toSB),
+          delivery_technique: isDirect ? "" : state.swing,
+          delivery_height: isDirect ? "" : state.height,
+          corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
+          body_part: isDirect && state.body === "Head" ? "Right Foot" : state.body,
+          shot_type: isDirect ? "Free Kick" : "",
+        };
+        const res = await fetch("/api/calculate_xg", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        setResult(await res.json() as XgResponse);
+      } catch (error) {
+        if (!isAbortError(error)) throw error;
+      }
     }, 120);
 
     return () => {
-      controller.abort();
       window.clearTimeout(timer);
+      controller.abort(new DOMException("Deadball xG request superseded", "AbortError"));
     };
   }, [isDirect, modelShot, state.attackers, state.body, state.defenders, state.gk, state.height, state.spType, state.swing, wallPlayers]);
 
@@ -276,26 +300,35 @@ export default function DeadballLab() {
       return;
     }
 
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
-      const res = await fetch("/api/calculate_xg_grid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          setpiece_type: state.spType,
-          gk: toSB(state.gk),
-          defenders: [...state.defenders, ...wallPlayers].map(toSB),
-          attackers: state.attackers.map(toSB),
-          delivery_technique: isDirect ? "" : state.swing,
-          delivery_height: isDirect ? "" : state.height,
-          corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
-          body_part: state.body,
-        }),
-      });
-      const data = await res.json() as GridResponse;
-      setHeat(data.grid.map((c) => ({ x: c.x * P_L / 120, y: c.y * P_W / 80, xg: c.xg })));
+      try {
+        const res = await fetch("/api/calculate_xg_grid", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            setpiece_type: state.spType,
+            gk: toSB(state.gk),
+            defenders: [...state.defenders, ...wallPlayers].map(toSB),
+            attackers: state.attackers.map(toSB),
+            delivery_technique: isDirect ? "" : state.swing,
+            delivery_height: isDirect ? "" : state.height,
+            corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
+            body_part: state.body,
+          }),
+          signal: controller.signal,
+        });
+        const data = await res.json() as GridResponse;
+        setHeat(data.grid.map((c) => ({ x: c.x * P_L / 120, y: c.y * P_W / 80, xg: c.xg })));
+      } catch (error) {
+        if (!isAbortError(error)) throw error;
+      }
     }, 180);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort(new DOMException("Deadball xG grid request superseded", "AbortError"));
+    };
   }, [isDirect, state.attackers, state.body, state.defenders, state.gk, state.height, state.showHeat, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
@@ -348,7 +381,7 @@ export default function DeadballLab() {
   };
 
   const directTarget: Point = [GX, clamp(GY - GOAL_W / 2 + state.ball[0], GY - GOAL_W / 2, GY + GOAL_W / 2)];
-  const shotPath = isDirect ? `M ${state.start[0]} ${state.start[1]} C ${state.start[0] + 7} ${state.start[1] - state.dip / 14} ${98} ${directTarget[1] + state.curve / 22} ${directTarget[0]} ${directTarget[1]}` : swingPath(state.start, state.shot, state.swing);
+  const shotPath = isDirect ? directFreeKickPath(state.start, directTarget, state.curve, state.dip) : swingPath(state.start, state.shot, state.swing);
   const [ballSvgX, ballSvgY] = goalPointToSvg(state.ball);
   const [gkSvgX, gkSvgY] = goalPointToSvg(state.gkf);
   const recommendation = result ? recommendationFor(result, combined, isDirect) : "Move the shot marker or load a preset to generate a tactical read.";
@@ -396,7 +429,7 @@ export default function DeadballLab() {
           <label>Finish / foot<select value={isDirect && state.body === "Head" ? "Right Foot" : state.body} onChange={(e) => update({ body: e.target.value })}><option hidden={isDirect}>Head</option><option>Right Foot</option><option>Left Foot</option></select></label>
           {isDirect && <div className="direct-fk-card open">
             <div className="fk-title">Direct FK craft</div>
-            <Slider label="Curve" value={state.curve} min={-100} max={100} onChange={(curve) => update({ curve })} suffix={state.curve === 0 ? " straight" : state.curve < 0 ? " left" : " right"} />
+            <Slider label="Curve" value={state.curve} min={0} max={100} onChange={(curve) => update({ curve })} suffix={state.curve === 0 ? " straight" : " bend"} />
             <Slider label="Dip" value={state.dip} min={0} max={100} onChange={(dip) => update({ dip })} />
             <Slider label="Knuckle" value={state.knuckle} min={0} max={100} onChange={(knuckle) => update({ knuckle })} />
           </div>}
