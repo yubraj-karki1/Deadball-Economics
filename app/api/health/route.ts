@@ -12,6 +12,6 @@ export async function GET() {
       setpiece: true,
     },
     p_shot: pShotByType(),
-    note: "The TypeScript build uses a native heuristic xG engine because Python pickle/XGBoost models cannot be loaded directly in the Next.js runtime.",
+    note: "The app runs on a native TypeScript heuristic xG engine.",
   });
 }

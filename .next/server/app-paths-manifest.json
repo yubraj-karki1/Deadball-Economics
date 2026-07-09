@@ -1,3 +1,4 @@
 {
-  "/api/calculate_xg/route": "app/api/calculate_xg/route.js"
+  "/api/calculate_xg/route": "app/api/calculate_xg/route.js",
+  "/page": "app/page.js"
 }
