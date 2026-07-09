@@ -107,3 +107,27 @@ stays in metres. This matches the Geometry of Pressure course's pitch exactly.
 
 The models train on the **36,055 shots**; the **217,795 taken** is only the
 denominator that turns shot xG into set-piece value.
+# Next.js + React + TypeScript build
+
+This repo now includes a native Next.js app alongside the original Python files.
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+The Next.js version lives in:
+
+- `app/deadball-lab.tsx` - React TypeScript set-piece lab UI
+- `lib/deadball.ts` - typed xG, grid, marking, wall and freeze-frame engine
+- `app/api/calculate_xg/route.ts` - xG endpoint
+- `app/api/calculate_xg_grid/route.ts` - heatmap endpoint
+- `app/api/health/route.ts` - health endpoint
+
+Note: the original Python app loads scikit-learn/XGBoost `.pkl` models. Those
+pickle artifacts cannot be loaded directly by a plain Next.js runtime, so the
+TypeScript app uses a native deterministic xG approximation calibrated from the
+same project metrics and geometry. The Python training/serving files remain in
+the repo for retraining and reference.
