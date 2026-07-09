@@ -16,6 +16,7 @@ const GOAL_H = 2.44;
 const GK_REACTION = 0.15;
 const GK_H = 4;
 const GK_V = 2.5;
+const SAVED_SCENARIOS_KEY = "deadball-economics-scenarios";
 
 type PresetKey = "nearPost" | "farPost" | "directFk" | "longThrow";
 type DragTarget = { kind: "shot" | "gk" | "start" | "def" | "atk"; index?: number } | null;
@@ -43,6 +44,8 @@ type LabState = {
   wallDistance: number;
   wallShift: number;
 };
+
+type SavedScenario = { id: string; name: string; state: LabState; createdAt: number; updatedAt: number };
 
 type PsxgCalc = {
   psxg: number;
@@ -161,6 +164,71 @@ const initialState: LabState = {
   wallShift: 0,
 };
 
+const makeScenarioId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+const isPoint = (value: unknown): value is Point => Array.isArray(value) && value.length === 2 && value.every((v) => typeof v === "number" && Number.isFinite(v));
+const pointsOr = (value: unknown, fallback: Point[]) => Array.isArray(value) && value.every(isPoint) ? value : fallback;
+const numberOr = (value: unknown, fallback: number) => typeof value === "number" && Number.isFinite(value) ? value : fallback;
+const stringOr = (value: unknown, fallback: string) => typeof value === "string" ? value : fallback;
+const boolOr = (value: unknown, fallback: boolean) => typeof value === "boolean" ? value : fallback;
+
+function normalizeLabState(value: unknown): LabState | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<LabState>;
+  if (!isPoint(raw.shot) || !isPoint(raw.gk) || !isPoint(raw.start) || !isPoint(raw.ball) || !isPoint(raw.gkf)) return null;
+
+  return {
+    spType: stringOr(raw.spType, initialState.spType),
+    shot: raw.shot,
+    gk: raw.gk,
+    start: raw.start,
+    defenders: pointsOr(raw.defenders, initialState.defenders),
+    attackers: pointsOr(raw.attackers, initialState.attackers),
+    swing: stringOr(raw.swing, initialState.swing),
+    height: stringOr(raw.height, initialState.height),
+    body: stringOr(raw.body, initialState.body),
+    showHeat: boolOr(raw.showHeat, false),
+    showVor: boolOr(raw.showVor, false),
+    ball: raw.ball,
+    gkf: raw.gkf,
+    shotSpeed: numberOr(raw.shotSpeed, initialState.shotSpeed),
+    curve: numberOr(raw.curve, initialState.curve),
+    dip: numberOr(raw.dip, initialState.dip),
+    knuckle: numberOr(raw.knuckle, initialState.knuckle),
+    wallSize: numberOr(raw.wallSize, initialState.wallSize),
+    wallDistance: numberOr(raw.wallDistance, initialState.wallDistance),
+    wallShift: numberOr(raw.wallShift, initialState.wallShift),
+  };
+}
+
+function readSavedScenarios() {
+  try {
+    const stored = window.localStorage.getItem(SAVED_SCENARIOS_KEY);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const raw = item as Partial<SavedScenario>;
+      const savedState = normalizeLabState(raw.state);
+      if (!savedState || typeof raw.id !== "string" || typeof raw.name !== "string") return [];
+      return [{
+        id: raw.id,
+        name: raw.name,
+        state: savedState,
+        createdAt: numberOr(raw.createdAt, Date.now()),
+        updatedAt: numberOr(raw.updatedAt, Date.now()),
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeSavedScenarios(scenarios: SavedScenario[]) {
+  window.localStorage.setItem(SAVED_SCENARIOS_KEY, JSON.stringify(scenarios));
+}
+
 function calcPhysics(ball: Point, gk: Point, speed: number, shotDistance: number, craftBonus = 0): PsxgCalc {
   const hd = Math.abs(ball[0] - gk[0]);
   const vd = Math.abs(ball[1] - Math.max(0, gk[1]));
@@ -203,7 +271,19 @@ function goalPointToSvg([x, y]: Point) {
   return [16 + x * 100, 16 + (GOAL_H - y) * 100] as Point;
 }
 
-function directFreeKickPath(start: Point, target: Point, curve: number) {
+function footAdjustedCurve(curve: number, foot: string) {
+  return foot === "Left Foot" ? -curve : curve;
+}
+
+function cubicPoint(start: Point, c1: Point, c2: Point, end: Point, t: number): Point {
+  const mt = 1 - t;
+  return [
+    mt ** 3 * start[0] + 3 * mt ** 2 * t * c1[0] + 3 * mt * t ** 2 * c2[0] + t ** 3 * end[0],
+    mt ** 3 * start[1] + 3 * mt ** 2 * t * c1[1] + 3 * mt * t ** 2 * c2[1] + t ** 3 * end[1],
+  ];
+}
+
+function directFreeKickVisual(start: Point, target: Point, curve: number, dip: number, knuckle: number) {
   const dx = target[0] - start[0];
   const dy = target[1] - start[1];
   const len = Math.hypot(dx, dy) || 1;
@@ -213,21 +293,47 @@ function directFreeKickPath(start: Point, target: Point, curve: number) {
   const ny = ux;
   const bendSide = start[1] < GY ? -1 : 1;
   const bend = curve / 100 * 5.5;
-  const c1Bend = bend * 0.55 * bendSide;
-  const c2Bend = bend * bendSide;
+  const dipStrength = clamp(dip / 100, 0, 1);
+  const knuckleStrength = clamp(knuckle / 100, 0, 1);
+  const flightSide = (curve === 0 ? 1 : Math.sign(curve)) * bendSide;
+  const dipLift = dipStrength * 4.8 * flightSide;
+  const lateDrop = dipStrength * 2.8 * -flightSide;
+  const wobble = knuckleStrength * 1.2;
+  const c1Bend = bend * 0.55 * bendSide + dipLift + wobble;
+  const c2Bend = bend * bendSide + lateDrop - wobble * 0.45;
 
   const c1x = start[0] + ux * len * 0.34 + nx * c1Bend;
   const c1y = start[1] + uy * len * 0.34 + ny * c1Bend;
   const c2x = start[0] + ux * len * 0.72 + nx * c2Bend;
   const c2y = start[1] + uy * len * 0.72 + ny * c2Bend;
+  const apexLift = (2.4 + dipStrength * 5.2) * flightSide;
+  const arcC1: Point = [start[0] + ux * len * 0.28 + nx * (c1Bend + apexLift), start[1] + uy * len * 0.28 + ny * (c1Bend + apexLift)];
+  const arcC2: Point = [start[0] + ux * len * 0.7 + nx * (c2Bend + apexLift * 0.28), start[1] + uy * len * 0.7 + ny * (c2Bend + apexLift * 0.28)];
+  const heightMarks = [0.3, 0.5, 0.7, 0.86].map((t, i) => {
+    const [x, y] = cubicPoint(start, arcC1, arcC2, target, t);
+    const fall = i / 3;
+    return {
+      x,
+      y,
+      radius: 0.18 + dipStrength * (0.48 - fall * 0.22),
+      opacity: 0.24 + dipStrength * (0.42 - fall * 0.12),
+    };
+  });
 
-  return `M ${start[0]} ${start[1]} C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${target[0]} ${target[1]}`;
+  return {
+    path: `M ${start[0]} ${start[1]} C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${target[0]} ${target[1]}`,
+    dipPath: `M ${start[0]} ${start[1]} C ${arcC1[0].toFixed(1)} ${arcC1[1].toFixed(1)} ${arcC2[0].toFixed(1)} ${arcC2[1].toFixed(1)} ${target[0]} ${target[1]}`,
+    heightMarks,
+  };
 }
 
 export default function DeadballLab() {
   const [state, setState] = useState<LabState>(initialState);
   const [scenarioName, setScenarioName] = useState("Near-post corner");
-  const [activePreset, setActivePreset] = useState<PresetKey>("nearPost");
+  const [activePreset, setActivePreset] = useState<PresetKey | null>("nearPost");
+  const [saveName, setSaveName] = useState("Custom setup");
+  const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([]);
+  const [selectedSavedId, setSelectedSavedId] = useState("");
   const [result, setResult] = useState<XgResponse | null>(null);
   const [heat, setHeat] = useState<GridResponse["grid"]>([]);
   const [drag, setDrag] = useState<DragTarget>(null);
@@ -239,6 +345,8 @@ export default function DeadballLab() {
   const isFreeKick = state.spType.startsWith("freekick");
   const isCorner = state.spType.startsWith("corner");
   const modelShot = isDirect ? state.start : state.shot;
+  const directFoot = isDirect && state.body === "Left Foot" ? "Left Foot" : "Right Foot";
+  const effectiveCurve = footAdjustedCurve(state.curve, directFoot);
   const craftBonus = isDirect ? Math.min(0.18, Math.abs(state.curve) / 100 * 0.055 + state.dip / 100 * 0.08 + state.knuckle / 100 * 0.07) : 0;
   const psxg = useMemo(() => calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus), [state.ball, state.gkf, state.shotSpeed, modelShot, craftBonus]);
   const combined = result ? result.xg * psxg.psxg : null;
@@ -261,6 +369,12 @@ export default function DeadballLab() {
   }, [isFreeKick, state.start, state.wallDistance, state.wallShift, state.wallSize]);
 
   useEffect(() => {
+    const scenarios = readSavedScenarios();
+    setSavedScenarios(scenarios);
+    setSelectedSavedId(scenarios[0]?.id ?? "");
+  }, []);
+
+  useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
@@ -275,10 +389,10 @@ export default function DeadballLab() {
           delivery_technique: isDirect ? "" : state.swing,
           delivery_height: isDirect ? "" : state.height,
           corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
-          body_part: isDirect && state.body === "Head" ? "Right Foot" : state.body,
+          body_part: isDirect ? directFoot : state.body,
           shot_type: isDirect ? "Free Kick" : "",
           shot_speed: isDirect ? state.shotSpeed : undefined,
-          shot_curve: isDirect ? state.curve : undefined,
+          shot_curve: isDirect ? effectiveCurve : undefined,
           shot_dip: isDirect ? state.dip : undefined,
           shot_knuckle: isDirect ? state.knuckle : undefined,
         };
@@ -298,7 +412,7 @@ export default function DeadballLab() {
       window.clearTimeout(timer);
       controller.abort(new DOMException("Deadball xG request superseded", "AbortError"));
     };
-  }, [isDirect, modelShot, state.attackers, state.body, state.curve, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
+  }, [effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
     if (!state.showHeat) {
@@ -320,10 +434,10 @@ export default function DeadballLab() {
             delivery_technique: isDirect ? "" : state.swing,
             delivery_height: isDirect ? "" : state.height,
             corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
-            body_part: state.body,
+            body_part: isDirect ? directFoot : state.body,
             shot_type: isDirect ? "Free Kick" : "",
             shot_speed: isDirect ? state.shotSpeed : undefined,
-            shot_curve: isDirect ? state.curve : undefined,
+            shot_curve: isDirect ? effectiveCurve : undefined,
             shot_dip: isDirect ? state.dip : undefined,
             shot_knuckle: isDirect ? state.knuckle : undefined,
           }),
@@ -340,7 +454,7 @@ export default function DeadballLab() {
       window.clearTimeout(timer);
       controller.abort(new DOMException("Deadball xG grid request superseded", "AbortError"));
     };
-  }, [isDirect, state.attackers, state.body, state.curve, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.showHeat, state.spType, state.swing, wallPlayers]);
+  }, [effectiveCurve, isDirect, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.showHeat, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
     const up = () => {
@@ -351,7 +465,44 @@ export default function DeadballLab() {
     return () => window.removeEventListener("pointerup", up);
   }, []);
 
-  const update = (patch: Partial<LabState>) => setState((s) => ({ ...s, ...patch }));
+  const update = (patch: Partial<LabState>) => {
+    setState((s) => ({ ...s, ...patch }));
+    setActivePreset(null);
+  };
+  const persistSavedScenarios = (scenarios: SavedScenario[]) => {
+    setSavedScenarios(scenarios);
+    writeSavedScenarios(scenarios);
+  };
+  const saveScenario = () => {
+    const name = (saveName.trim() || scenarioName.trim() || "Custom setup").slice(0, 64);
+    const now = Date.now();
+    const existing = savedScenarios.find((s) => s.name.toLowerCase() === name.toLowerCase());
+    const saved: SavedScenario = {
+      id: existing?.id ?? makeScenarioId(),
+      name,
+      state,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    };
+    const next = existing ? savedScenarios.map((s) => (s.id === existing.id ? saved : s)) : [saved, ...savedScenarios];
+    persistSavedScenarios(next);
+    setSelectedSavedId(saved.id);
+    setScenarioName(name);
+    setActivePreset(null);
+  };
+  const loadScenario = () => {
+    const saved = savedScenarios.find((s) => s.id === selectedSavedId);
+    if (!saved) return;
+    setState(saved.state);
+    setScenarioName(saved.name);
+    setSaveName(saved.name);
+    setActivePreset(null);
+  };
+  const deleteScenario = () => {
+    const next = savedScenarios.filter((s) => s.id !== selectedSavedId);
+    persistSavedScenarios(next);
+    setSelectedSavedId(next[0]?.id ?? "");
+  };
   const pitchPoint = (e: PointerEvent<SVGSVGElement>): Point => {
     const r = pitchRef.current!.getBoundingClientRect();
     return [
@@ -392,7 +543,8 @@ export default function DeadballLab() {
   };
 
   const directTarget: Point = [GX, clamp(GY - GOAL_W / 2 + state.ball[0], GY - GOAL_W / 2, GY + GOAL_W / 2)];
-  const shotPath = isDirect ? directFreeKickPath(state.start, directTarget, state.curve) : swingPath(state.start, state.shot, state.swing);
+  const directVisual = isDirect ? directFreeKickVisual(state.start, directTarget, effectiveCurve, state.dip, state.knuckle) : null;
+  const shotPath = directVisual?.path ?? swingPath(state.start, state.shot, state.swing);
   const [ballSvgX, ballSvgY] = goalPointToSvg(state.ball);
   const [gkSvgX, gkSvgY] = goalPointToSvg(state.gkf);
   const recommendation = result ? recommendationFor(result, combined, isDirect) : "Move the shot marker or load a preset to generate a tactical read.";
@@ -419,6 +571,28 @@ export default function DeadballLab() {
       <main className="grid">
         <aside className="panel controls">
           <div className="panel-head"><span>Scenario</span><b>{scenarioName}</b></div>
+          <div className="scenario-library">
+            <div className="fk-title">Scenario library</div>
+            <label>Name
+              <input type="text" value={saveName} maxLength={64} onChange={(e) => setSaveName(e.target.value)} />
+            </label>
+            <div className="scenario-actions">
+              <button className="btn" onClick={saveScenario}>Save</button>
+              <button className="btn" onClick={loadScenario} disabled={!selectedSavedId}>Load</button>
+              <button className="btn danger" onClick={deleteScenario} disabled={!selectedSavedId}>Delete</button>
+            </div>
+            <label>Saved setups
+              <select value={selectedSavedId} onChange={(e) => {
+                const id = e.target.value;
+                const saved = savedScenarios.find((s) => s.id === id);
+                setSelectedSavedId(id);
+                if (saved) setSaveName(saved.name);
+              }}>
+                {savedScenarios.length === 0 && <option value="">No saved setups</option>}
+                {savedScenarios.map((saved) => <option key={saved.id} value={saved.id}>{saved.name}</option>)}
+              </select>
+            </label>
+          </div>
           <label>Set piece
             <select value={state.spType} onChange={(e) => {
               const spType = e.target.value;
@@ -437,7 +611,7 @@ export default function DeadballLab() {
             <label>Swing<select value={state.swing} onChange={(e) => update({ swing: e.target.value })}><option>Inswinging</option><option>Outswinging</option><option>Straight</option></select></label>
             <label>Height<select value={state.height} onChange={(e) => update({ height: e.target.value })}><option>High Pass</option><option>Low Pass</option><option>Ground Pass</option></select></label>
           </>}
-          <label>Finish / foot<select value={isDirect && state.body === "Head" ? "Right Foot" : state.body} onChange={(e) => update({ body: e.target.value })}><option hidden={isDirect}>Head</option><option>Right Foot</option><option>Left Foot</option></select></label>
+          <label>Finish / foot<select value={isDirect ? directFoot : state.body} onChange={(e) => update({ body: e.target.value })}><option hidden={isDirect}>Head</option><option>Right Foot</option><option>Left Foot</option></select></label>
           {isDirect && <div className="direct-fk-card open">
             <div className="fk-title">Direct FK craft</div>
             <Slider label="Curve" value={state.curve} min={-100} max={100} onChange={(curve) => update({ curve })} suffix={state.curve === 0 ? " straight" : " bend"} />
@@ -469,7 +643,9 @@ export default function DeadballLab() {
             <PitchMarks />
             {state.showVor && <Voronoi defenders={[...state.defenders, ...wallPlayers]} attackers={state.attackers} gk={state.gk} />}
             {heat.map((c, i) => <rect key={i} x={c.x - 1.1} y={c.y - 1.3} width="2.2" height="2.6" fill={heatColor(c.xg)} opacity="0.5" />)}
+            {directVisual && state.dip > 0 && <path d={directVisual.dipPath} fill="none" stroke="#fff9d6" strokeWidth={0.16 + state.dip / 230} strokeDasharray="0.8 1" opacity={0.15 + state.dip / 170} />}
             <path d={shotPath} fill="none" stroke="#d7f25c" strokeWidth="0.48" strokeDasharray="1.2 0.8" />
+            {directVisual && state.dip > 0 && directVisual.heightMarks.map((mark, i) => <circle key={`dip${i}`} cx={mark.x} cy={mark.y} r={mark.radius} fill="#fff9d6" opacity={mark.opacity} />)}
             {state.attackers.map((a, i) => <Player key={`a${i}`} p={a} color="#2dd4bf" onPointerDown={() => setDrag({ kind: "atk", index: i })} />)}
             {state.defenders.map((d, i) => <Player key={`d${i}`} p={d} color="#ff5a5f" onPointerDown={() => setDrag({ kind: "def", index: i })} />)}
             {wallPlayers.map((d, i) => <g key={`w${i}`}><Player p={d} color="#f6b73c" /><text x={d[0]} y={d[1] + 0.34} textAnchor="middle" fontSize="0.82" fill="#241706" fontWeight="bold">W</text></g>)}

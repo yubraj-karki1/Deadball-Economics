@@ -193,6 +193,7 @@ label {
 }
 
 select,
+input[type=text],
 input[type=range] { width: 100%; }
 
 input[type=range] {
@@ -210,8 +211,20 @@ select {
   font-weight: 850;
 }
 
+input[type=text] {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--ink);
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
 select:focus-visible,
 button:focus-visible,
+input[type=text]:focus-visible,
 input[type=range]:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--deep);
@@ -224,7 +237,29 @@ a:focus-visible {
   gap: 8px;
 }
 
+.scenario-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.btn.danger {
+  border-color: rgba(255, 90, 95, 0.42);
+}
+
+.btn.danger:hover:not(:disabled) {
+  background: #ff5a5f;
+  border-color: #ff5a5f;
+  color: #200607;
+}
+
 .mini-card,
+.scenario-library,
 .direct-fk-card,
 .fk-wall-card,
 .formula-live {
