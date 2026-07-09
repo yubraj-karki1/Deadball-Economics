@@ -239,7 +239,7 @@ export default function DeadballLab() {
   const isFreeKick = state.spType.startsWith("freekick");
   const isCorner = state.spType.startsWith("corner");
   const modelShot = isDirect ? state.start : state.shot;
-  const craftBonus = isDirect ? Math.min(0.18, Math.abs(state.curve) / 100 * 0.055 + state.dip / 100 * 0.045 + state.knuckle / 100 * 0.07) : 0;
+  const craftBonus = isDirect ? Math.min(0.18, Math.abs(state.curve) / 100 * 0.055 + state.dip / 100 * 0.08 + state.knuckle / 100 * 0.07) : 0;
   const psxg = useMemo(() => calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus), [state.ball, state.gkf, state.shotSpeed, modelShot, craftBonus]);
   const combined = result ? result.xg * psxg.psxg : null;
   const wallPlayers = useMemo(() => {
@@ -526,6 +526,8 @@ export default function DeadballLab() {
             <Row k="In box - def / atk" v={`${result?.derived.defenders_in_box ?? "-"} / ${result?.derived.attackers_in_box ?? "-"}`} />
             {isFreeKick && <Row k="Wall" v={`${result?.derived.wall_size ?? state.wallSize} players`} />}
             {isDirect && <Row k="Craft" v={`${Number(result?.derived.direct_craft_logit ?? 0).toFixed(3)} logit`} />}
+            {isDirect && <Row k="Dip effect" v={`${Number(result?.derived.direct_dip_logit ?? 0).toFixed(3)} logit`} />}
+            {isDirect && <Row k="Knuckle effect" v={`${Number(result?.derived.direct_knuckle_logit ?? 0).toFixed(3)} logit`} />}
           </div>
           <div className="card small insight"><div className="bk-title">Analyst note</div><div>{recommendation}</div></div>
         </aside>

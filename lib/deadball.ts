@@ -184,13 +184,21 @@ function directCraft(req: Partial<XgRequest>) {
   const dip = clamp(Number(req.shot_dip ?? 0) / 100, 0, 1);
   const knuckle = clamp(Number(req.shot_knuckle ?? 0) / 100, 0, 1);
   const speed = clamp((Number(req.shot_speed ?? 85) - 40) / 100, 0, 1);
-  const logit = curve * 0.14 + dip * 0.16 + knuckle * 0.18 + speed * 0.08;
+  const curveLogit = curve * 0.14;
+  const dipLogit = dip * 0.32;
+  const knuckleLogit = knuckle * 0.18;
+  const speedLogit = speed * 0.08;
+  const logit = curveLogit + dipLogit + knuckleLogit + speedLogit;
 
   return {
     shot_speed: round2(Number(req.shot_speed ?? 0)),
     shot_curve: round2(Number(req.shot_curve ?? 0)),
     shot_dip: round2(Number(req.shot_dip ?? 0)),
     shot_knuckle: round2(Number(req.shot_knuckle ?? 0)),
+    direct_curve_logit: round4(curveLogit),
+    direct_dip_logit: round4(dipLogit),
+    direct_knuckle_logit: round4(knuckleLogit),
+    direct_speed_logit: round4(speedLogit),
     direct_craft_logit: round4(logit),
   };
 }

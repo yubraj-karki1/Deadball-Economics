@@ -7,8 +7,8 @@
    - Network:      http://172.18.224.1:3000
 
  ✓ Starting...
- ✓ Ready in 2.4s
+ ✓ Ready in 2.9s
  ○ Compiling /api/calculate_xg ...
- ✓ Compiled /api/calculate_xg in 857ms (298 modules)
- POST /api/calculate_xg 200 in 1056ms
- POST /api/calculate_xg 200 in 13ms
+ ✓ Compiled /api/calculate_xg in 795ms (298 modules)
+ POST /api/calculate_xg 200 in 1043ms
+ POST /api/calculate_xg 200 in 16ms
