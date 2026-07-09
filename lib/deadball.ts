@@ -15,6 +15,10 @@ export type XgRequest = {
   body_part?: string;
   shot_technique?: string;
   shot_type?: string;
+  shot_speed?: number;
+  shot_curve?: number;
+  shot_dip?: number;
+  shot_knuckle?: number;
   minute?: number;
 };
 
@@ -175,6 +179,22 @@ function wallSize(shot: Point, defenders: Point[] = []) {
   return n;
 }
 
+function directCraft(req: Partial<XgRequest>) {
+  const curve = clamp(Math.abs(Number(req.shot_curve ?? 0)) / 100, 0, 1);
+  const dip = clamp(Number(req.shot_dip ?? 0) / 100, 0, 1);
+  const knuckle = clamp(Number(req.shot_knuckle ?? 0) / 100, 0, 1);
+  const speed = clamp((Number(req.shot_speed ?? 85) - 40) / 100, 0, 1);
+  const logit = curve * 0.14 + dip * 0.16 + knuckle * 0.18 + speed * 0.08;
+
+  return {
+    shot_speed: round2(Number(req.shot_speed ?? 0)),
+    shot_curve: round2(Number(req.shot_curve ?? 0)),
+    shot_dip: round2(Number(req.shot_dip ?? 0)),
+    shot_knuckle: round2(Number(req.shot_knuckle ?? 0)),
+    direct_craft_logit: round4(logit),
+  };
+}
+
 function heuristicXg(kind: keyof typeof P_SHOT, req: XgRequest, derived: ReturnType<typeof freeze>, mark: ReturnType<typeof marking>, wall: number) {
   const x = Number(req.shot_x);
   const y = Number(req.shot_y);
@@ -209,7 +229,7 @@ function heuristicXg(kind: keyof typeof P_SHOT, req: XgRequest, derived: ReturnT
 
   if (kind === "freekick") {
     if (isDirectFreekick(req, kind)) {
-      logit = -2.9 + clamp((29 - distance) / 9.5, -1.25, 1.15) - centrality * 0.018 - wall * 0.09;
+      logit = -2.9 + clamp((29 - distance) / 9.5, -1.25, 1.15) - centrality * 0.018 - wall * 0.09 + directCraft(req).direct_craft_logit;
     } else {
       logit -= 0.16;
     }
@@ -231,9 +251,11 @@ export function predict(req: XgRequest): XgResponse {
   const attackers = req.attackers ?? [];
   const derived = freeze(shot, req.gk, defenders, attackers);
   const mark = marking(defenders, attackers);
-  const wall = isDirectFreekick(req, base) ? wallSize(shot, defenders) : 0;
+  const direct = isDirectFreekick(req, base);
+  const wall = direct ? wallSize(shot, defenders) : 0;
+  const craft = direct ? directCraft(req) : null;
   const xg = heuristicXg(kind, req, derived, mark, wall);
-  const pShot = isDirectFreekick(req, base) ? 1 : P_SHOT[kind];
+  const pShot = direct ? 1 : P_SHOT[kind];
 
   return {
     xg: round4(xg),
@@ -244,11 +266,12 @@ export function predict(req: XgRequest): XgResponse {
     zone: zoneOf(shot[0], shot[1]),
     marking_label: mark.marking_label,
     distance_to_goal: round2(dist(shot[0], shot[1], 120, 40)),
-    features_used: 30,
+    features_used: direct ? 34 : 30,
     derived: {
       ...derived,
       man_ratio: mark.man_ratio,
       wall_size: wall,
+      ...(craft ?? {}),
     },
   };
 }

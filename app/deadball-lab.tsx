@@ -203,7 +203,7 @@ function goalPointToSvg([x, y]: Point) {
   return [16 + x * 100, 16 + (GOAL_H - y) * 100] as Point;
 }
 
-function directFreeKickPath(start: Point, target: Point, curve: number, dip: number) {
+function directFreeKickPath(start: Point, target: Point, curve: number) {
   const dx = target[0] - start[0];
   const dy = target[1] - start[1];
   const len = Math.hypot(dx, dy) || 1;
@@ -212,12 +212,14 @@ function directFreeKickPath(start: Point, target: Point, curve: number, dip: num
   const nx = -uy;
   const ny = ux;
   const bendSide = start[1] < GY ? -1 : 1;
-  const bend = curve / 12;
+  const bend = curve / 100 * 5.5;
+  const c1Bend = bend * 0.55 * bendSide;
+  const c2Bend = bend * bendSide;
 
-  const c1x = start[0] + ux * 7;
-  const c1y = start[1] + uy * 7 - dip / 14;
-  const c2x = target[0] - ux * 7 + nx * bend * bendSide;
-  const c2y = target[1] - uy * 7 + ny * bend * bendSide;
+  const c1x = start[0] + ux * len * 0.34 + nx * c1Bend;
+  const c1y = start[1] + uy * len * 0.34 + ny * c1Bend;
+  const c2x = start[0] + ux * len * 0.72 + nx * c2Bend;
+  const c2y = start[1] + uy * len * 0.72 + ny * c2Bend;
 
   return `M ${start[0]} ${start[1]} C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${target[0]} ${target[1]}`;
 }
@@ -237,7 +239,7 @@ export default function DeadballLab() {
   const isFreeKick = state.spType.startsWith("freekick");
   const isCorner = state.spType.startsWith("corner");
   const modelShot = isDirect ? state.start : state.shot;
-  const craftBonus = isDirect ? Math.min(0.18, state.curve / 100 * 0.055 + state.dip / 100 * 0.045 + state.knuckle / 100 * 0.07) : 0;
+  const craftBonus = isDirect ? Math.min(0.18, Math.abs(state.curve) / 100 * 0.055 + state.dip / 100 * 0.045 + state.knuckle / 100 * 0.07) : 0;
   const psxg = useMemo(() => calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus), [state.ball, state.gkf, state.shotSpeed, modelShot, craftBonus]);
   const combined = result ? result.xg * psxg.psxg : null;
   const wallPlayers = useMemo(() => {
@@ -275,6 +277,10 @@ export default function DeadballLab() {
           corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
           body_part: isDirect && state.body === "Head" ? "Right Foot" : state.body,
           shot_type: isDirect ? "Free Kick" : "",
+          shot_speed: isDirect ? state.shotSpeed : undefined,
+          shot_curve: isDirect ? state.curve : undefined,
+          shot_dip: isDirect ? state.dip : undefined,
+          shot_knuckle: isDirect ? state.knuckle : undefined,
         };
         const res = await fetch("/api/calculate_xg", {
           method: "POST",
@@ -292,7 +298,7 @@ export default function DeadballLab() {
       window.clearTimeout(timer);
       controller.abort(new DOMException("Deadball xG request superseded", "AbortError"));
     };
-  }, [isDirect, modelShot, state.attackers, state.body, state.defenders, state.gk, state.height, state.spType, state.swing, wallPlayers]);
+  }, [isDirect, modelShot, state.attackers, state.body, state.curve, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
     if (!state.showHeat) {
@@ -315,6 +321,11 @@ export default function DeadballLab() {
             delivery_height: isDirect ? "" : state.height,
             corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
             body_part: state.body,
+            shot_type: isDirect ? "Free Kick" : "",
+            shot_speed: isDirect ? state.shotSpeed : undefined,
+            shot_curve: isDirect ? state.curve : undefined,
+            shot_dip: isDirect ? state.dip : undefined,
+            shot_knuckle: isDirect ? state.knuckle : undefined,
           }),
           signal: controller.signal,
         });
@@ -329,7 +340,7 @@ export default function DeadballLab() {
       window.clearTimeout(timer);
       controller.abort(new DOMException("Deadball xG grid request superseded", "AbortError"));
     };
-  }, [isDirect, state.attackers, state.body, state.defenders, state.gk, state.height, state.showHeat, state.spType, state.swing, wallPlayers]);
+  }, [isDirect, state.attackers, state.body, state.curve, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.showHeat, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
     const up = () => {
@@ -381,7 +392,7 @@ export default function DeadballLab() {
   };
 
   const directTarget: Point = [GX, clamp(GY - GOAL_W / 2 + state.ball[0], GY - GOAL_W / 2, GY + GOAL_W / 2)];
-  const shotPath = isDirect ? directFreeKickPath(state.start, directTarget, state.curve, state.dip) : swingPath(state.start, state.shot, state.swing);
+  const shotPath = isDirect ? directFreeKickPath(state.start, directTarget, state.curve) : swingPath(state.start, state.shot, state.swing);
   const [ballSvgX, ballSvgY] = goalPointToSvg(state.ball);
   const [gkSvgX, gkSvgY] = goalPointToSvg(state.gkf);
   const recommendation = result ? recommendationFor(result, combined, isDirect) : "Move the shot marker or load a preset to generate a tactical read.";
@@ -429,7 +440,7 @@ export default function DeadballLab() {
           <label>Finish / foot<select value={isDirect && state.body === "Head" ? "Right Foot" : state.body} onChange={(e) => update({ body: e.target.value })}><option hidden={isDirect}>Head</option><option>Right Foot</option><option>Left Foot</option></select></label>
           {isDirect && <div className="direct-fk-card open">
             <div className="fk-title">Direct FK craft</div>
-            <Slider label="Curve" value={state.curve} min={0} max={100} onChange={(curve) => update({ curve })} suffix={state.curve === 0 ? " straight" : " bend"} />
+            <Slider label="Curve" value={state.curve} min={-100} max={100} onChange={(curve) => update({ curve })} suffix={state.curve === 0 ? " straight" : " bend"} />
             <Slider label="Dip" value={state.dip} min={0} max={100} onChange={(dip) => update({ dip })} />
             <Slider label="Knuckle" value={state.knuckle} min={0} max={100} onChange={(knuckle) => update({ knuckle })} />
           </div>}
@@ -514,6 +525,7 @@ export default function DeadballLab() {
             <Row k="Marking" v={result?.marking_label || "-"} />
             <Row k="In box - def / atk" v={`${result?.derived.defenders_in_box ?? "-"} / ${result?.derived.attackers_in_box ?? "-"}`} />
             {isFreeKick && <Row k="Wall" v={`${result?.derived.wall_size ?? state.wallSize} players`} />}
+            {isDirect && <Row k="Craft" v={`${Number(result?.derived.direct_craft_logit ?? 0).toFixed(3)} logit`} />}
           </div>
           <div className="card small insight"><div className="bk-title">Analyst note</div><div>{recommendation}</div></div>
         </aside>

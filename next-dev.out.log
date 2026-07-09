@@ -7,16 +7,8 @@
    - Network:      http://172.18.224.1:3000
 
  ✓ Starting...
- ✓ Ready in 3.9s
- ○ Compiling / ...
- ✓ Compiled / in 3.6s (545 modules)
- GET / 200 in 4011ms
- GET / 200 in 92ms
- ✓ Compiled /api/calculate_xg in 339ms (552 modules)
- POST /api/calculate_xg 200 in 455ms
- ✓ Compiled /api/health in 136ms (554 modules)
- GET /api/health 200 in 221ms
- POST /api/calculate_xg 500 in 40ms
- GET /api/health 200 in 54ms
- POST /api/calculate_xg 200 in 15ms
- ✓ Compiled in 478ms (532 modules)
+ ✓ Ready in 2.4s
+ ○ Compiling /api/calculate_xg ...
+ ✓ Compiled /api/calculate_xg in 857ms (298 modules)
+ POST /api/calculate_xg 200 in 1056ms
+ POST /api/calculate_xg 200 in 13ms
