@@ -469,33 +469,33 @@ export default function DeadballLab() {
             <PitchMarks />
             {state.showVor && <Voronoi defenders={[...state.defenders, ...wallPlayers]} attackers={state.attackers} gk={state.gk} />}
             {heat.map((c, i) => <rect key={i} x={c.x - 1.1} y={c.y - 1.3} width="2.2" height="2.6" fill={heatColor(c.xg)} opacity="0.5" />)}
-            <path d={shotPath} fill="none" stroke="#facc15" strokeWidth="0.48" strokeDasharray="1.2 0.8" />
-            {state.attackers.map((a, i) => <Player key={`a${i}`} p={a} color="#2563eb" onPointerDown={() => setDrag({ kind: "atk", index: i })} />)}
-            {state.defenders.map((d, i) => <Player key={`d${i}`} p={d} color="#dc2626" onPointerDown={() => setDrag({ kind: "def", index: i })} />)}
-            {wallPlayers.map((d, i) => <g key={`w${i}`}><Player p={d} color="#fb923c" /><text x={d[0]} y={d[1] + 0.34} textAnchor="middle" fontSize="0.82" fill="#1f1304" fontWeight="bold">W</text></g>)}
-            <Player p={state.gk} color="#facc15" label="GK" onPointerDown={() => setDrag({ kind: "gk" })} />
-            <Player p={state.start} color="#facc15" radius={0.8} onPointerDown={() => setDrag({ kind: "start" })} />
+            <path d={shotPath} fill="none" stroke="#d7f25c" strokeWidth="0.48" strokeDasharray="1.2 0.8" />
+            {state.attackers.map((a, i) => <Player key={`a${i}`} p={a} color="#2dd4bf" onPointerDown={() => setDrag({ kind: "atk", index: i })} />)}
+            {state.defenders.map((d, i) => <Player key={`d${i}`} p={d} color="#ff5a5f" onPointerDown={() => setDrag({ kind: "def", index: i })} />)}
+            {wallPlayers.map((d, i) => <g key={`w${i}`}><Player p={d} color="#f6b73c" /><text x={d[0]} y={d[1] + 0.34} textAnchor="middle" fontSize="0.82" fill="#241706" fontWeight="bold">W</text></g>)}
+            <Player p={state.gk} color="#d7f25c" label="GK" onPointerDown={() => setDrag({ kind: "gk" })} />
+            <Player p={state.start} color="#d7f25c" radius={0.8} onPointerDown={() => setDrag({ kind: "start" })} />
             {!isDirect ? <>
               <line x1={state.shot[0]} y1={state.shot[1]} x2={GX} y2={GY} stroke="#ffffffaa" strokeWidth="0.25" strokeDasharray="1.2 0.8" />
               <Player p={state.shot} color="#fff" radius={1.12} onPointerDown={() => setDrag({ kind: "shot" })} />
             </> : <circle cx={directTarget[0]} cy={directTarget[1]} r="0.45" fill="#fff" stroke="#111" strokeWidth="0.2" />}
           </svg>
-          <div className="legend"><Legend color="#fff" text="Shot" /><Legend color="#facc15" text="Delivery / GK" /><Legend color="#dc2626" text="Defenders" /><Legend color="#2563eb" text="Attackers" /><Legend color="#fb923c" text="Wall" /></div>
+          <div className="legend"><Legend color="#fff9d6" text="Shot" /><Legend color="#d7f25c" text="Delivery / GK" /><Legend color="#ff5a5f" text="Defenders" /><Legend color="#2dd4bf" text="Attackers" /><Legend color="#f6b73c" text="Wall" /></div>
         </section>
 
         <section className="panel psxgpanel">
           <div className="panel-head"><span>Post-shot xG</span><b>GK biomechanics</b></div>
           <svg ref={goalRef} viewBox="0 0 764 280" className="goalframe" onPointerMove={onGoalMove}>
             <rect x="11" y="11" width="742" height="254" fill="none" stroke="#fff" strokeWidth="8" rx="2" />
-            <rect x="16" y="16" width="732" height="244" fill="rgba(0,80,0,.4)" />
+            <rect x="16" y="16" width="732" height="244" fill="rgba(18,92,51,.42)" />
             {Array.from({ length: 4 }).map((_, c) => Array.from({ length: 3 }).map((__, r) => {
               const x = (c + 0.5) * GOAL_W / 4;
               const y = GOAL_H - (r + 0.5) * GOAL_H / 3;
               const v = calcPhysics([x, y], state.gkf, state.shotSpeed, distM(modelShot), craftBonus).psxg;
               return <g key={`${c}-${r}`}><rect x={16 + c * 183} y={16 + r * 81.33} width="183" height="81.33" fill={zoneFill(v)} stroke="rgba(255,255,255,.25)" /><text x={16 + c * 183 + 91.5} y={16 + r * 81.33 + 44} textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{v.toFixed(2)}</text></g>;
             }))}
-            <ellipse cx={gkSvgX} cy={gkSvgY} rx={Math.max(50, (psxg.ballTime - 0.15) * GK_H * 100)} ry={Math.max(50, (psxg.ballTime - 0.15) * GK_V * 100)} fill="rgba(34,197,94,.18)" stroke="rgba(34,197,94,.85)" strokeDasharray="6 4" />
-            <g onPointerDown={() => setGoalDrag("gk")} className="grab"><rect x={gkSvgX - 18} y={gkSvgY - 104} width="36" height="90" rx="10" fill="#dc2626" stroke="#fff" /><circle cx={gkSvgX} cy={gkSvgY - 118} r="12" fill="#e8b89a" stroke="#fff" /><text x={gkSvgX} y={gkSvgY - 60} textAnchor="middle" fill="#fff" fontSize="11" fontWeight="bold">GK</text></g>
+            <ellipse cx={gkSvgX} cy={gkSvgY} rx={Math.max(50, (psxg.ballTime - 0.15) * GK_H * 100)} ry={Math.max(50, (psxg.ballTime - 0.15) * GK_V * 100)} fill="rgba(45,212,191,.16)" stroke="rgba(45,212,191,.9)" strokeDasharray="6 4" />
+            <g onPointerDown={() => setGoalDrag("gk")} className="grab"><rect x={gkSvgX - 18} y={gkSvgY - 104} width="36" height="90" rx="10" fill="#ff5a5f" stroke="#fff" /><circle cx={gkSvgX} cy={gkSvgY - 118} r="12" fill="#f0bc8f" stroke="#fff" /><text x={gkSvgX} y={gkSvgY - 60} textAnchor="middle" fill="#fff" fontSize="11" fontWeight="bold">GK</text></g>
             <g onPointerDown={() => setGoalDrag("ball")} className="grab"><circle cx={ballSvgX} cy={ballSvgY} r="16" fill="#fff" stroke="#333" strokeWidth="2" /><text x={ballSvgX} y={ballSvgY + 29} textAnchor="middle" fill="#fff" fontSize="12" fontWeight="bold">BALL</text></g>
           </svg>
           <Slider label="Shot speed" value={state.shotSpeed} min={40} max={140} onChange={(shotSpeed) => update({ shotSpeed })} suffix=" km/h" />
@@ -543,7 +543,7 @@ function Slider({ label, value, min, max, step = 1, suffix = "", onChange }: { l
 }
 
 function Player({ p, color, label, radius = 0.95, onPointerDown }: { p: Point; color: string; label?: string; radius?: number; onPointerDown?: () => void }) {
-  return <g onPointerDown={onPointerDown} className={onPointerDown ? "grab" : undefined}><circle cx={p[0]} cy={p[1]} r={radius} fill={color} stroke="#fff" strokeWidth="0.22" />{label && <text x={p[0]} y={p[1] + 0.35} textAnchor="middle" fontSize="0.9" fill="#1f2937" fontWeight="bold">{label}</text>}</g>;
+  return <g onPointerDown={onPointerDown} className={onPointerDown ? "grab" : undefined}><circle cx={p[0]} cy={p[1]} r={radius} fill={color} stroke="#fff9d6" strokeWidth="0.22" />{label && <text x={p[0]} y={p[1] + 0.35} textAnchor="middle" fontSize="0.9" fill="#15200c" fontWeight="bold">{label}</text>}</g>;
 }
 
 function PitchMarks() {
@@ -551,11 +551,11 @@ function PitchMarks() {
 }
 
 function Voronoi({ defenders, attackers, gk }: { defenders: Point[]; attackers: Point[]; gk: Point }) {
-  const pts: Array<[Point, string]> = [...defenders.map((p) => [p, "#f87171"] as [Point, string]), ...attackers.map((p) => [p, "#60a5fa"] as [Point, string]), [gk, "#fbbf24"]];
+  const pts: Array<[Point, string]> = [...defenders.map((p) => [p, "#ff8a76"] as [Point, string]), ...attackers.map((p) => [p, "#6ee7d8"] as [Point, string]), [gk, "#d7f25c"]];
   const cells = [];
   for (let x = X0; x <= X1; x += 1.4) for (let y = 0; y <= 68; y += 1.4) {
     let best = Infinity;
-    let col = "#64748b";
+    let col = "#5a6b5f";
     for (const [p, c] of pts) {
       const d = (p[0] - x) ** 2 + (p[1] - y) ** 2;
       if (d < best) {
@@ -569,12 +569,12 @@ function Voronoi({ defenders, attackers, gk }: { defenders: Point[]; attackers: 
 }
 
 function zoneFill(v: number) {
-  if (v >= 0.8) return "rgba(233,30,99,.65)";
-  if (v >= 0.65) return "rgba(233,30,99,.5)";
-  if (v >= 0.5) return "rgba(255,152,0,.55)";
-  if (v >= 0.35) return "rgba(255,193,7,.5)";
-  if (v >= 0.25) return "rgba(139,195,74,.5)";
-  return "rgba(76,175,80,.55)";
+  if (v >= 0.8) return "rgba(255,90,95,.68)";
+  if (v >= 0.65) return "rgba(255,111,72,.58)";
+  if (v >= 0.5) return "rgba(246,183,60,.58)";
+  if (v >= 0.35) return "rgba(215,242,92,.46)";
+  if (v >= 0.25) return "rgba(45,212,191,.42)";
+  return "rgba(34,126,86,.5)";
 }
 
 function recommendationFor(r: XgResponse, combined: number | null, isDirect: boolean) {
