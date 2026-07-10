@@ -1,5 +1,13 @@
 export type Point = [number, number];
 
+export type ModelCalibration = {
+  distanceWeight?: number;
+  angleWeight?: number;
+  wallPenalty?: number;
+  craftBonus?: number;
+  gkReaction?: number;
+};
+
 export type XgRequest = {
   setpiece_type?: string;
   shot_x: number;
@@ -19,6 +27,7 @@ export type XgRequest = {
   shot_curve?: number;
   shot_dip?: number;
   shot_knuckle?: number;
+  calibration?: ModelCalibration;
   minute?: number;
 };
 
@@ -65,6 +74,7 @@ const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax -
 const sigmoid = (v: number) => 1 / (1 + Math.exp(-v));
 const round4 = (v: number) => Math.round(v * 10000) / 10000;
 const round2 = (v: number) => Math.round(v * 100) / 100;
+const scale = (v: unknown, fallback = 1) => Number.isFinite(Number(v)) ? clamp(Number(v), 0.25, 2) : fallback;
 
 export function pShotByType() {
   return P_SHOT;
@@ -212,10 +222,15 @@ function heuristicXg(kind: keyof typeof P_SHOT, req: XgRequest, derived: ReturnT
   const body = req.body_part ?? "";
   const delivery = req.delivery_technique ?? "";
   const height = req.delivery_height ?? "";
+  const calibration = req.calibration ?? {};
+  const distanceWeight = scale(calibration.distanceWeight);
+  const angleWeight = scale(calibration.angleWeight);
+  const wallPenalty = scale(calibration.wallPenalty);
+  const craftBonus = scale(calibration.craftBonus);
 
   let logit = -2.45;
-  logit += clamp((18 - distance) / 7.5, -2.1, 1.8);
-  logit += clamp((7 - centrality) / 14, -0.8, 0.6);
+  logit += clamp((18 - distance) / 7.5, -2.1, 1.8) * distanceWeight;
+  logit += clamp((7 - centrality) / 14, -0.8, 0.6) * angleWeight;
   logit += (x - 104) * 0.035;
   logit += derived.nearest_defender_dist ? clamp((derived.nearest_defender_dist - 1.5) * 0.14, -0.35, 0.35) : 0.08;
   logit -= Math.max(0, derived.defenders_in_6yard - 1) * 0.08;
@@ -237,7 +252,11 @@ function heuristicXg(kind: keyof typeof P_SHOT, req: XgRequest, derived: ReturnT
 
   if (kind === "freekick") {
     if (isDirectFreekick(req, kind)) {
-      logit = -2.9 + clamp((29 - distance) / 9.5, -1.25, 1.15) - centrality * 0.018 - wall * 0.09 + directCraft(req).direct_craft_logit;
+      logit = -2.9
+        + clamp((29 - distance) / 9.5, -1.25, 1.15) * distanceWeight
+        - centrality * 0.018 * angleWeight
+        - wall * 0.09 * wallPenalty
+        + directCraft(req).direct_craft_logit * craftBonus;
     } else {
       logit -= 0.16;
     }
@@ -279,6 +298,10 @@ export function predict(req: XgRequest): XgResponse {
       ...derived,
       man_ratio: mark.man_ratio,
       wall_size: wall,
+      calibration_distance_weight: round2(scale(req.calibration?.distanceWeight)),
+      calibration_angle_weight: round2(scale(req.calibration?.angleWeight)),
+      calibration_wall_penalty: round2(scale(req.calibration?.wallPenalty)),
+      calibration_craft_bonus: round2(scale(req.calibration?.craftBonus)),
       ...(craft ?? {}),
     },
   };

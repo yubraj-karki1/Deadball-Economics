@@ -1,7 +1,7 @@
 "use client";
 
-import { PointerEvent, useEffect, useMemo, useRef, useState } from "react";
-import type { GridResponse, Point, XgResponse } from "../lib/deadball";
+import { ChangeEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { predict, type GridResponse, type ModelCalibration, type Point, type XgResponse } from "../lib/deadball";
 
 const P_L = 105;
 const P_W = 68;
@@ -17,6 +17,7 @@ const GK_REACTION = 0.15;
 const GK_H = 4;
 const GK_V = 2.5;
 const SAVED_SCENARIOS_KEY = "deadball-economics-scenarios";
+const SAVED_TRAINED_MODELS_KEY = "deadball-economics-trained-models";
 
 type PresetKey = "nearPost" | "farPost" | "directFk" | "longThrow";
 type DragTarget = { kind: "shot" | "gk" | "start" | "def" | "atk"; index?: number } | null;
@@ -43,9 +44,12 @@ type LabState = {
   wallSize: number;
   wallDistance: number;
   wallShift: number;
+  calibration: Required<ModelCalibration>;
 };
 
 type SavedScenario = { id: string; name: string; state: LabState; createdAt: number; updatedAt: number };
+type TrainedModel = { id: string; name: string; calibration: Required<ModelCalibration>; rows: number; goalRate: number; loss: number; createdAt: number };
+type TrainingReport = { rows: number; goals: number; goalRate: number; loss: number; model: TrainedModel } | { error: string };
 
 type PsxgCalc = {
   psxg: number;
@@ -64,6 +68,7 @@ type PsxgCalc = {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const pct = (v: number | null | undefined) => (v == null || Number.isNaN(v) ? "-" : `${(v * 100).toFixed(1)}%`);
+const sigmoid = (v: number) => 1 / (1 + Math.exp(-v));
 const distM = (p: Point) => Math.hypot(GX - p[0], GY - p[1]);
 const toSB = (p: Point): Point => [+(p[0] * 120 / P_L).toFixed(2), +(p[1] * 80 / P_W).toFixed(2)];
 const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
@@ -72,6 +77,14 @@ const heatColor = (xg: number) => {
   const r = t < 0.5 ? Math.round(80 + 350 * t) : 235;
   const g = t < 0.5 ? 200 : Math.round(200 - 150 * (t - 0.5) * 2);
   return `rgb(${r},${g},70)`;
+};
+
+const DEFAULT_CALIBRATION: Required<ModelCalibration> = {
+  distanceWeight: 1,
+  angleWeight: 1,
+  wallPenalty: 1,
+  craftBonus: 1,
+  gkReaction: 1,
 };
 
 function defaultStart(t: string): Point {
@@ -126,6 +139,7 @@ const PRESETS: Record<PresetKey, { name: string } & Partial<LabState>> = {
     wallSize: 4,
     wallDistance: 9,
     wallShift: 0.5,
+    calibration: DEFAULT_CALIBRATION,
   },
   longThrow: {
     name: "Long throw",
@@ -162,6 +176,7 @@ const initialState: LabState = {
   wallSize: 0,
   wallDistance: 9,
   wallShift: 0,
+  calibration: DEFAULT_CALIBRATION,
 };
 
 const makeScenarioId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
@@ -170,6 +185,17 @@ const pointsOr = (value: unknown, fallback: Point[]) => Array.isArray(value) && 
 const numberOr = (value: unknown, fallback: number) => typeof value === "number" && Number.isFinite(value) ? value : fallback;
 const stringOr = (value: unknown, fallback: string) => typeof value === "string" ? value : fallback;
 const boolOr = (value: unknown, fallback: boolean) => typeof value === "boolean" ? value : fallback;
+
+function calibrationOr(value: unknown): Required<ModelCalibration> {
+  const raw = value && typeof value === "object" ? value as Partial<ModelCalibration> : {};
+  return {
+    distanceWeight: clamp(numberOr(raw.distanceWeight, DEFAULT_CALIBRATION.distanceWeight), 0.25, 2),
+    angleWeight: clamp(numberOr(raw.angleWeight, DEFAULT_CALIBRATION.angleWeight), 0.25, 2),
+    wallPenalty: clamp(numberOr(raw.wallPenalty, DEFAULT_CALIBRATION.wallPenalty), 0.25, 2),
+    craftBonus: clamp(numberOr(raw.craftBonus, DEFAULT_CALIBRATION.craftBonus), 0.25, 2),
+    gkReaction: clamp(numberOr(raw.gkReaction, DEFAULT_CALIBRATION.gkReaction), 0.25, 2),
+  };
+}
 
 function normalizeLabState(value: unknown): LabState | null {
   if (!value || typeof value !== "object") return null;
@@ -197,6 +223,7 @@ function normalizeLabState(value: unknown): LabState | null {
     wallSize: numberOr(raw.wallSize, initialState.wallSize),
     wallDistance: numberOr(raw.wallDistance, initialState.wallDistance),
     wallShift: numberOr(raw.wallShift, initialState.wallShift),
+    calibration: calibrationOr(raw.calibration),
   };
 }
 
@@ -229,14 +256,175 @@ function writeSavedScenarios(scenarios: SavedScenario[]) {
   window.localStorage.setItem(SAVED_SCENARIOS_KEY, JSON.stringify(scenarios));
 }
 
-function calcPhysics(ball: Point, gk: Point, speed: number, shotDistance: number, craftBonus = 0): PsxgCalc {
+function readTrainedModels() {
+  try {
+    const stored = window.localStorage.getItem(SAVED_TRAINED_MODELS_KEY);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const raw = item as Partial<TrainedModel>;
+      if (typeof raw.id !== "string" || typeof raw.name !== "string") return [];
+      return [{
+        id: raw.id,
+        name: raw.name,
+        calibration: calibrationOr(raw.calibration),
+        rows: numberOr(raw.rows, 0),
+        goalRate: numberOr(raw.goalRate, 0),
+        loss: numberOr(raw.loss, 0),
+        createdAt: numberOr(raw.createdAt, Date.now()),
+      }];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeTrainedModels(models: TrainedModel[]) {
+  window.localStorage.setItem(SAVED_TRAINED_MODELS_KEY, JSON.stringify(models));
+}
+
+function parseCsvLine(line: string) {
+  const cells: string[] = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+    if (char === "\"" && quoted && next === "\"") {
+      cell += "\"";
+      i += 1;
+    } else if (char === "\"") {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+
+  cells.push(cell.trim());
+  return cells;
+}
+
+function parseCsv(text: string) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = parseCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
+
+  return lines.slice(1).map((line) => {
+    const cells = parseCsvLine(line);
+    return Object.fromEntries(headers.map((header, i) => [header, cells[i] ?? ""]));
+  });
+}
+
+function csvNumber(row: Record<string, string>, names: string[]) {
+  for (const name of names) {
+    const value = row[name];
+    if (value == null || value === "") continue;
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function csvGoal(row: Record<string, string>) {
+  const raw = (row.goal ?? row.is_goal ?? row.scored ?? row.outcome ?? row.result ?? "").trim().toLowerCase();
+  if (["1", "true", "yes", "goal", "scored"].includes(raw)) return 1;
+  if (["0", "false", "no", "miss", "missed", "saved", "blocked", "off target"].includes(raw)) return 0;
+  const numeric = Number(raw);
+  return numeric === 1 ? 1 : numeric === 0 ? 0 : null;
+}
+
+function rowTrainingFeatures(row: Record<string, string>) {
+  const goal = csvGoal(row);
+  const rawX = csvNumber(row, ["shot_x", "x", "location_x"]);
+  const rawY = csvNumber(row, ["shot_y", "y", "location_y"]);
+  if (goal == null || rawX == null || rawY == null) return null;
+
+  const x = rawX <= P_L ? rawX * 120 / P_L : rawX;
+  const y = rawY <= P_W ? rawY * 80 / P_W : rawY;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+  const distance = Math.hypot(120 - x, 40 - y);
+  const centrality = Math.abs(y - 40);
+  const wall = csvNumber(row, ["wall_size", "wall", "wall_players"]) ?? 0;
+  const curve = Math.abs(csvNumber(row, ["shot_curve", "curve"]) ?? 0) / 100;
+  const dip = (csvNumber(row, ["shot_dip", "dip"]) ?? 0) / 100;
+  const knuckle = (csvNumber(row, ["shot_knuckle", "knuckle"]) ?? 0) / 100;
+  const speed = clamp(((csvNumber(row, ["shot_speed", "speed"]) ?? 85) - 40) / 100, 0, 1);
+
+  return {
+    goal,
+    features: [
+      clamp((18 - distance) / 7.5, -2.1, 1.8),
+      clamp((7 - centrality) / 14, -0.8, 0.6),
+      -Math.max(0, wall) * 0.09,
+      clamp(curve, 0, 1) * 0.14 + clamp(dip, 0, 1) * 0.32 + clamp(knuckle, 0, 1) * 0.18 + speed * 0.08,
+    ],
+  };
+}
+
+function trainCalibrationFromCsv(text: string, name: string): TrainingReport {
+  const rows = parseCsv(text).map(rowTrainingFeatures).filter((row): row is NonNullable<ReturnType<typeof rowTrainingFeatures>> => row != null);
+  if (rows.length < 12) return { error: "Need at least 12 valid rows with goal, shot_x and shot_y columns." };
+
+  let weights = [0, 1, 1, 1, 1];
+  const learningRate = 0.08;
+  const l2 = 0.002;
+
+  for (let step = 0; step < 650; step += 1) {
+    const gradients = [0, 0, 0, 0, 0];
+    for (const row of rows) {
+      const z = weights[0] + row.features.reduce((sum, feature, i) => sum + weights[i + 1] * feature, 0);
+      const error = sigmoid(z) - row.goal;
+      gradients[0] += error;
+      row.features.forEach((feature, i) => {
+        gradients[i + 1] += error * feature + l2 * weights[i + 1];
+      });
+    }
+    weights = weights.map((weight, i) => weight - learningRate * gradients[i] / rows.length);
+  }
+
+  const loss = rows.reduce((sum, row) => {
+    const z = weights[0] + row.features.reduce((total, feature, i) => total + weights[i + 1] * feature, 0);
+    const p = clamp(sigmoid(z), 0.001, 0.999);
+    return sum - (row.goal * Math.log(p) + (1 - row.goal) * Math.log(1 - p));
+  }, 0) / rows.length;
+  const goals = rows.reduce((sum, row) => sum + row.goal, 0);
+
+  const calibration: Required<ModelCalibration> = {
+    distanceWeight: clamp(Math.abs(weights[1]), 0.25, 2),
+    angleWeight: clamp(Math.abs(weights[2]), 0.25, 2),
+    wallPenalty: clamp(Math.abs(weights[3]), 0.25, 2),
+    craftBonus: clamp(Math.abs(weights[4]), 0.25, 2),
+    gkReaction: 1,
+  };
+  const model: TrainedModel = {
+    id: makeScenarioId(),
+    name: (name.trim() || "Trained model").slice(0, 64),
+    calibration,
+    rows: rows.length,
+    goalRate: goals / rows.length,
+    loss,
+    createdAt: Date.now(),
+  };
+
+  return { rows: rows.length, goals, goalRate: goals / rows.length, loss, model };
+}
+
+function calcPhysics(ball: Point, gk: Point, speed: number, shotDistance: number, craftBonus = 0, calibration: Required<ModelCalibration> = DEFAULT_CALIBRATION): PsxgCalc {
   const hd = Math.abs(ball[0] - gk[0]);
   const vd = Math.abs(ball[1] - Math.max(0, gk[1]));
   const speedMs = speed / 3.6;
   const ballTime = speedMs > 0 ? shotDistance / speedMs : 999;
   const hTime = hd / GK_H;
   const vTime = vd / GK_V;
-  const reaction = GK_REACTION + craftBonus * 0.45;
+  const reaction = (GK_REACTION + craftBonus * 0.45) * calibration.gkReaction;
   const diveTime = reaction + Math.max(hTime, vTime);
   const margin = diveTime - ballTime;
   let psxg = margin > 0.3 ? 0.95 : margin > 0.15 ? 0.75 + (margin - 0.15) * 1.33 : margin > 0.05 ? 0.55 + (margin - 0.05) * 2 : margin > -0.05 ? 0.15 + (margin + 0.05) * 4 : margin > -0.15 ? 0.08 + (margin + 0.15) * 0.7 : margin > -0.3 ? 0.03 + (margin + 0.3) * 0.33 : 0.03;
@@ -273,6 +461,82 @@ function goalPointToSvg([x, y]: Point) {
 
 function footAdjustedCurve(curve: number, foot: string) {
   return foot === "Left Foot" ? -curve : curve;
+}
+
+function fmt(v: number, digits = 3) {
+  if (!Number.isFinite(v)) return "-";
+  return v.toFixed(digits);
+}
+
+function signed(v: number, digits = 3) {
+  if (!Number.isFinite(v)) return "-";
+  return `${v >= 0 ? "+" : ""}${v.toFixed(digits)}`;
+}
+
+function xgMath(result: XgResponse | null, state: LabState, modelShot: Point, isDirect: boolean, calibration: Required<ModelCalibration>) {
+  if (!result) return null;
+  const [x, y] = toSB(modelShot);
+  const distance = Math.hypot(120 - x, 40 - y);
+  const centrality = Math.abs(y - 40);
+  const derived = result.derived;
+  const kind = result.setpiece_type;
+  const body = isDirect && state.body === "Head" ? "Right Foot" : state.body;
+  const nearest = Number(derived.nearest_defender_dist ?? 0);
+  const sixYard = Number(derived.defenders_in_6yard ?? 0);
+  const attackers = Number(derived.attackers_in_box ?? 0);
+  const gkLine = Number(derived.gk_dist_from_line ?? 0);
+  const zone = result.zone;
+  const marking = result.marking_label;
+  const terms: Array<[string, number]> = [];
+  let base = -2.45;
+
+  if (kind === "freekick" && isDirect) {
+    const distanceTerm = clamp((29 - distance) / 9.5, -1.25, 1.15) * calibration.distanceWeight;
+    const centerTerm = -centrality * 0.018 * calibration.angleWeight;
+    const wallTerm = -Number(derived.wall_size ?? state.wallSize) * 0.09 * calibration.wallPenalty;
+    const craftTerm = Number(derived.direct_craft_logit ?? 0) * calibration.craftBonus;
+    base = -2.9;
+    terms.push(["distance", distanceTerm], ["angle", centerTerm], ["wall", wallTerm], ["craft", craftTerm]);
+  } else {
+    terms.push(
+      ["distance", clamp((18 - distance) / 7.5, -2.1, 1.8) * calibration.distanceWeight],
+      ["angle", clamp((7 - centrality) / 14, -0.8, 0.6) * calibration.angleWeight],
+      ["shot x", (x - 104) * 0.035],
+      ["nearest def", nearest ? clamp((nearest - 1.5) * 0.14, -0.35, 0.35) : 0.08],
+      ["six-yard def", -Math.max(0, sixYard - 1) * 0.08],
+      ["attackers", Math.min(attackers, 5) * 0.035],
+      ["GK line", gkLine > 0 ? -clamp((gkLine - 1.5) * 0.04, -0.12, 0.18) : 0],
+    );
+    if (zone === "near-post" || zone === "far-post") terms.push(["zone", 0.32]);
+    if (zone === "penalty-spot") terms.push(["zone", 0.18]);
+    if (zone === "edge") terms.push(["zone", -0.38]);
+    if (zone === "second-ball") terms.push(["zone", -0.75]);
+    if (body === "Head") terms.push(["body", kind === "corner" ? 0.08 : -0.04]);
+    if (body.includes("Foot")) terms.push(["body", 0.04]);
+    if (state.swing === "Inswinging") terms.push(["delivery", 0.12]);
+    if (state.swing === "Outswinging") terms.push(["delivery", -0.08]);
+    if (state.height === "Low Pass") terms.push(["height", 0.1]);
+    if (state.height === "Ground Pass") terms.push(["height", -0.1]);
+    if (marking === "man") terms.push(["marking", -0.18]);
+    if (marking === "zonal") terms.push(["marking", 0.08]);
+    if (kind === "freekick") terms.push(["crossed FK", -0.16]);
+    if (kind === "throwin") {
+      terms.push(["throw-in", -0.1]);
+      if (state.spType.includes("long")) terms.push(["long throw", 0.14]);
+    }
+  }
+
+  const logit = base + terms.reduce((sum, [, value]) => sum + value, 0);
+  const rawXg = sigmoid(logit);
+  return {
+    base,
+    terms,
+    logit,
+    rawXg,
+    clampedXg: clamp(rawXg, 0.006, 0.62),
+    distance,
+    centrality,
+  };
 }
 
 function cubicPoint(start: Point, c1: Point, c2: Point, end: Point, t: number): Point {
@@ -334,6 +598,10 @@ export default function DeadballLab() {
   const [saveName, setSaveName] = useState("Custom setup");
   const [savedScenarios, setSavedScenarios] = useState<SavedScenario[]>([]);
   const [selectedSavedId, setSelectedSavedId] = useState("");
+  const [trainedModels, setTrainedModels] = useState<TrainedModel[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState("");
+  const [modelName, setModelName] = useState("Custom trained model");
+  const [trainingReport, setTrainingReport] = useState<TrainingReport | null>(null);
   const [result, setResult] = useState<XgResponse | null>(null);
   const [heat, setHeat] = useState<GridResponse["grid"]>([]);
   const [drag, setDrag] = useState<DragTarget>(null);
@@ -348,7 +616,7 @@ export default function DeadballLab() {
   const directFoot = isDirect && state.body === "Left Foot" ? "Left Foot" : "Right Foot";
   const effectiveCurve = footAdjustedCurve(state.curve, directFoot);
   const craftBonus = isDirect ? Math.min(0.18, Math.abs(state.curve) / 100 * 0.055 + state.dip / 100 * 0.08 + state.knuckle / 100 * 0.07) : 0;
-  const psxg = useMemo(() => calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus), [state.ball, state.gkf, state.shotSpeed, modelShot, craftBonus]);
+  const psxg = useMemo(() => calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus, state.calibration), [state.ball, state.calibration, state.gkf, state.shotSpeed, modelShot, craftBonus]);
   const combined = result ? result.xg * psxg.psxg : null;
   const wallPlayers = useMemo(() => {
     if (!isFreeKick || state.wallSize <= 0) return [];
@@ -375,6 +643,12 @@ export default function DeadballLab() {
   }, []);
 
   useEffect(() => {
+    const models = readTrainedModels();
+    setTrainedModels(models);
+    setSelectedModelId(models[0]?.id ?? "");
+  }, []);
+
+  useEffect(() => {
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
@@ -395,6 +669,7 @@ export default function DeadballLab() {
           shot_curve: isDirect ? effectiveCurve : undefined,
           shot_dip: isDirect ? state.dip : undefined,
           shot_knuckle: isDirect ? state.knuckle : undefined,
+          calibration: state.calibration,
         };
         const res = await fetch("/api/calculate_xg", {
           method: "POST",
@@ -412,7 +687,7 @@ export default function DeadballLab() {
       window.clearTimeout(timer);
       controller.abort(new DOMException("Deadball xG request superseded", "AbortError"));
     };
-  }, [effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
+  }, [effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.calibration, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
     if (!state.showHeat) {
@@ -440,6 +715,7 @@ export default function DeadballLab() {
             shot_curve: isDirect ? effectiveCurve : undefined,
             shot_dip: isDirect ? state.dip : undefined,
             shot_knuckle: isDirect ? state.knuckle : undefined,
+            calibration: state.calibration,
           }),
           signal: controller.signal,
         });
@@ -454,7 +730,7 @@ export default function DeadballLab() {
       window.clearTimeout(timer);
       controller.abort(new DOMException("Deadball xG grid request superseded", "AbortError"));
     };
-  }, [effectiveCurve, isDirect, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.showHeat, state.spType, state.swing, wallPlayers]);
+  }, [effectiveCurve, isDirect, state.attackers, state.body, state.calibration, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.showHeat, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
     const up = () => {
@@ -468,6 +744,9 @@ export default function DeadballLab() {
   const update = (patch: Partial<LabState>) => {
     setState((s) => ({ ...s, ...patch }));
     setActivePreset(null);
+  };
+  const updateCalibration = (patch: Partial<ModelCalibration>) => {
+    update({ calibration: calibrationOr({ ...state.calibration, ...patch }) });
   };
   const persistSavedScenarios = (scenarios: SavedScenario[]) => {
     setSavedScenarios(scenarios);
@@ -502,6 +781,37 @@ export default function DeadballLab() {
     const next = savedScenarios.filter((s) => s.id !== selectedSavedId);
     persistSavedScenarios(next);
     setSelectedSavedId(next[0]?.id ?? "");
+  };
+  const persistTrainedModels = (models: TrainedModel[]) => {
+    setTrainedModels(models);
+    writeTrainedModels(models);
+  };
+  const applyTrainedModel = (modelId = selectedModelId) => {
+    const model = trainedModels.find((item) => item.id === modelId);
+    if (!model) return;
+    update({ calibration: model.calibration });
+    setSelectedModelId(model.id);
+    setModelName(model.name);
+  };
+  const deleteTrainedModel = () => {
+    const next = trainedModels.filter((item) => item.id !== selectedModelId);
+    persistTrainedModels(next);
+    setSelectedModelId(next[0]?.id ?? "");
+  };
+  const trainFromCsv = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const report = trainCalibrationFromCsv(await file.text(), modelName);
+    setTrainingReport(report);
+    if ("error" in report) return;
+
+    const next = [report.model, ...trainedModels.filter((model) => model.name.toLowerCase() !== report.model.name.toLowerCase())];
+    persistTrainedModels(next);
+    setSelectedModelId(report.model.id);
+    setModelName(report.model.name);
+    update({ calibration: report.model.calibration });
   };
   const pitchPoint = (e: PointerEvent<SVGSVGElement>): Point => {
     const r = pitchRef.current!.getBoundingClientRect();
@@ -547,6 +857,28 @@ export default function DeadballLab() {
   const shotPath = directVisual?.path ?? swingPath(state.start, state.shot, state.swing);
   const [ballSvgX, ballSvgY] = goalPointToSvg(state.ball);
   const [gkSvgX, gkSvgY] = goalPointToSvg(state.gkf);
+  const xgSolution = xgMath(result, state, modelShot, isDirect, state.calibration);
+  const defaultModelResult = useMemo(() => {
+    const [shot_x, shot_y] = toSB(modelShot);
+    return predict({
+      setpiece_type: state.spType,
+      shot_x,
+      shot_y,
+      gk: toSB(state.gk),
+      defenders: [...state.defenders, ...wallPlayers].map(toSB),
+      attackers: state.attackers.map(toSB),
+      delivery_technique: isDirect ? "" : state.swing,
+      delivery_height: isDirect ? "" : state.height,
+      corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
+      body_part: isDirect ? directFoot : state.body,
+      shot_type: isDirect ? "Free Kick" : "",
+      shot_speed: isDirect ? state.shotSpeed : undefined,
+      shot_curve: isDirect ? effectiveCurve : undefined,
+      shot_dip: isDirect ? state.dip : undefined,
+      shot_knuckle: isDirect ? state.knuckle : undefined,
+      calibration: DEFAULT_CALIBRATION,
+    });
+  }, [directFoot, effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
   const recommendation = result ? recommendationFor(result, combined, isDirect) : "Move the shot marker or load a preset to generate a tactical read.";
 
   return (
@@ -634,6 +966,49 @@ export default function DeadballLab() {
             <button className={`btn toggle ${state.showHeat ? "on" : ""}`} onClick={() => update({ showHeat: !state.showHeat })}>xG heatmap</button>
             <button className={`btn toggle ${state.showVor ? "on" : ""}`} onClick={() => update({ showVor: !state.showVor })}>Voronoi</button>
           </div>
+          <div className="calibration-card open">
+            <div className="panel-row-title">
+              <span className="fk-title">Model calibration</span>
+              <button className="mini-btn" onClick={() => update({ calibration: DEFAULT_CALIBRATION })}>Reset</button>
+            </div>
+            <Slider label="Distance weight" value={state.calibration.distanceWeight} min={0.25} max={2} step={0.05} onChange={(distanceWeight) => updateCalibration({ distanceWeight })} suffix="x" />
+            <Slider label="Angle weight" value={state.calibration.angleWeight} min={0.25} max={2} step={0.05} onChange={(angleWeight) => updateCalibration({ angleWeight })} suffix="x" />
+            <Slider label="Wall penalty" value={state.calibration.wallPenalty} min={0.25} max={2} step={0.05} onChange={(wallPenalty) => updateCalibration({ wallPenalty })} suffix="x" />
+            <Slider label="Direct FK craft" value={state.calibration.craftBonus} min={0.25} max={2} step={0.05} onChange={(craftBonus) => updateCalibration({ craftBonus })} suffix="x" />
+            <Slider label="GK reaction" value={state.calibration.gkReaction} min={0.25} max={2} step={0.05} onChange={(gkReaction) => updateCalibration({ gkReaction })} suffix="x" />
+          </div>
+          <div className="training-card open">
+            <div className="fk-title">Retrain model</div>
+            <label>Model name
+              <input type="text" value={modelName} maxLength={64} onChange={(e) => setModelName(e.target.value)} />
+            </label>
+            <label>Training CSV
+              <input type="file" accept=".csv,text/csv" onChange={trainFromCsv} />
+            </label>
+            <div className="tool-row">
+              <button className="btn" onClick={() => applyTrainedModel()} disabled={!selectedModelId}>Apply</button>
+              <button className="btn danger" onClick={deleteTrainedModel} disabled={!selectedModelId}>Delete</button>
+            </div>
+            <label>Trained models
+              <select value={selectedModelId} onChange={(e) => {
+                const id = e.target.value;
+                const model = trainedModels.find((item) => item.id === id);
+                setSelectedModelId(id);
+                if (model) setModelName(model.name);
+              }}>
+                {trainedModels.length === 0 && <option value="">No trained models</option>}
+                {trainedModels.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+              </select>
+            </label>
+            <div className="training-stats">
+              <Row k="Default / active xG" v={`${pct(defaultModelResult.xg)} / ${pct(result?.xg)}`} />
+              {trainingReport && "error" in trainingReport && <Row k="Training" v={trainingReport.error} />}
+              {trainingReport && !("error" in trainingReport) && <>
+                <Row k="Rows / goals" v={`${trainingReport.rows} / ${trainingReport.goals}`} />
+                <Row k="Goal rate / loss" v={`${pct(trainingReport.goalRate)} / ${fmt(trainingReport.loss)}`} />
+              </>}
+            </div>
+          </div>
           <div className="mini-card"><span>Pitch mode</span><b>105 x 68 m</b></div>
         </aside>
 
@@ -657,6 +1032,21 @@ export default function DeadballLab() {
             </> : <circle cx={directTarget[0]} cy={directTarget[1]} r="0.45" fill="#fff" stroke="#111" strokeWidth="0.2" />}
           </svg>
           <div className="legend"><Legend color="#fff9d6" text="Shot" /><Legend color="#d7f25c" text="Delivery / GK" /><Legend color="#ff5a5f" text="Defenders" /><Legend color="#2dd4bf" text="Attackers" /><Legend color="#f6b73c" text="Wall" /></div>
+          <div className="pitch-math-grid">
+            {xgSolution && <div className="calculation-card math-card">
+              <div className="bk-title">xG calculation</div>
+              <div className="equation">xG = clamp(1 / (1 + e^(-logit)), 0.006, 0.62)</div>
+              <Row k="Base logit" v={fmt(xgSolution.base)} />
+              <Row k="Terms" v={xgSolution.terms.map(([name, value]) => `${name} ${signed(value, 2)}`).join("  ")} />
+              <Row k="Logit total" v={`${fmt(xgSolution.logit)} -> raw ${pct(xgSolution.rawXg)}`} />
+              <Row k="Final xG" v={`${pct(xgSolution.clampedXg)} shown as ${pct(result?.xg)}`} />
+            </div>}
+            <div className="calculation-card math-card combined-math">
+              <div className="bk-title">Combined</div>
+              <div className="equation">Combined = xG x PSxG</div>
+              <Row k="Calculation" v={`${pct(result?.xg)} x ${pct(psxg.psxg)} = ${pct(combined)}`} />
+            </div>
+          </div>
         </section>
 
         <section className="panel psxgpanel">
@@ -667,7 +1057,7 @@ export default function DeadballLab() {
             {Array.from({ length: 4 }).map((_, c) => Array.from({ length: 3 }).map((__, r) => {
               const x = (c + 0.5) * GOAL_W / 4;
               const y = GOAL_H - (r + 0.5) * GOAL_H / 3;
-              const v = calcPhysics([x, y], state.gkf, state.shotSpeed, distM(modelShot), craftBonus).psxg;
+              const v = calcPhysics([x, y], state.gkf, state.shotSpeed, distM(modelShot), craftBonus, state.calibration).psxg;
               return <g key={`${c}-${r}`}><rect x={16 + c * 183} y={16 + r * 81.33} width="183" height="81.33" fill={zoneFill(v)} stroke="rgba(255,255,255,.25)" /><text x={16 + c * 183 + 91.5} y={16 + r * 81.33 + 44} textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{v.toFixed(2)}</text></g>;
             }))}
             <ellipse cx={gkSvgX} cy={gkSvgY} rx={Math.max(50, (psxg.ballTime - 0.15) * GK_H * 100)} ry={Math.max(50, (psxg.ballTime - 0.15) * GK_V * 100)} fill="rgba(45,212,191,.16)" stroke="rgba(45,212,191,.9)" strokeDasharray="6 4" />
@@ -688,6 +1078,13 @@ export default function DeadballLab() {
             <span>Ball time</span><b>{distM(modelShot).toFixed(2)} / {psxg.speedMs.toFixed(2)} = {psxg.ballTime.toFixed(3)} s</b>
             <span>GK dx / dy</span><b>{psxg.hd.toFixed(2)} m / {psxg.vd.toFixed(2)} m</b>
             <span>GK reach</span><b>{psxg.reaction.toFixed(3)} + max({psxg.hTime.toFixed(3)}, {psxg.vTime.toFixed(3)}) = {psxg.diveTime.toFixed(3)} s</b>
+          </div>
+          <div className="calculation-card math-card psxg-calculation">
+            <div className="bk-title">PSxG calculation</div>
+            <div className="equation">PSxG = clamp(f(GK reach - ball time), 0.01, 0.99)</div>
+            <Row k="Ball time" v={`${fmt(distM(modelShot), 2)} / ${fmt(psxg.speedMs, 2)} = ${fmt(psxg.ballTime)} s`} />
+            <Row k="Reach time" v={`${fmt(psxg.reaction)} + max(${fmt(psxg.hTime)}, ${fmt(psxg.vTime)}) = ${fmt(psxg.diveTime)} s`} />
+            <Row k="Time margin" v={`${signed(psxg.margin)} s -> ${pct(psxg.psxg)}`} />
           </div>
         </section>
 
@@ -715,7 +1112,8 @@ export default function DeadballLab() {
 }
 
 function Slider({ label, value, min, max, step = 1, suffix = "", onChange }: { label: string; value: number; min: number; max: number; step?: number; suffix?: string; onChange: (value: number) => void }) {
-  return <label>{label} <b>{value.toFixed(step < 1 ? 1 : 0)}{suffix}</b><input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} /></label>;
+  const digits = step < 0.1 ? 2 : step < 1 ? 1 : 0;
+  return <label>{label} <b>{value.toFixed(digits)}{suffix}</b><input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} /></label>;
 }
 
 function Player({ p, color, label, radius = 0.95, onPointerDown }: { p: Point; color: string; label?: string; radius?: number; onPointerDown?: () => void }) {

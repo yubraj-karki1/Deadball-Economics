@@ -194,6 +194,7 @@ label {
 
 select,
 input[type=text],
+input[type=file],
 input[type=range] { width: 100%; }
 
 input[type=range] {
@@ -222,9 +223,21 @@ input[type=text] {
   font-weight: 800;
 }
 
+input[type=file] {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--muted);
+  padding: 7px 9px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 select:focus-visible,
 button:focus-visible,
 input[type=text]:focus-visible,
+input[type=file]:focus-visible,
 input[type=range]:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--deep);
@@ -260,6 +273,8 @@ a:focus-visible {
 
 .mini-card,
 .scenario-library,
+.calibration-card,
+.training-card,
 .direct-fk-card,
 .fk-wall-card,
 .formula-live {
@@ -272,6 +287,39 @@ a:focus-visible {
 .mini-card {
   display: flex;
   justify-content: space-between;
+}
+
+.training-stats {
+  display: grid;
+  gap: 8px;
+}
+
+.panel-row-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-row-title .fk-title {
+  margin-bottom: 0;
+}
+
+.mini-btn {
+  min-height: 26px;
+  padding: 0 8px;
+  border: 1px solid rgba(215, 242, 92, 0.2);
+  border-radius: 7px;
+  background: rgba(215, 242, 92, 0.08);
+  color: #fff9d6;
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.mini-btn:hover {
+  background: var(--deep);
+  color: #15200c;
 }
 
 .fk-title,
@@ -314,6 +362,29 @@ a:focus-visible {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
+}
+
+.pitch-math-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.calculation-card {
+  min-width: 0;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(215, 242, 92, 0.13);
+  background: rgba(10, 18, 13, 0.78);
+}
+
+.combined-math {
+  grid-column: auto;
+}
+
+.psxg-calculation {
+  margin-top: 10px;
 }
 
 .dot {
@@ -393,6 +464,27 @@ a:focus-visible {
   font-weight: 800;
 }
 
+.math-card {
+  display: grid;
+  gap: 8px;
+}
+
+.equation {
+  padding: 9px;
+  border-radius: 8px;
+  background: rgba(215, 242, 92, 0.08);
+  color: #fff9d6;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.math-card .row b {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
 .small {
   display: grid;
   gap: 8px;
@@ -428,5 +520,6 @@ a:focus-visible {
   .controls { position: static; max-height: none; width: 100%; }
   .pitch { min-height: 520px; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
+  .pitch-math-grid { grid-template-columns: 1fr; }
   .formula-live { grid-template-columns: 1fr; }
 }
