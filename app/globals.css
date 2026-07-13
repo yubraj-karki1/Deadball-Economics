@@ -234,11 +234,26 @@ input[type=file] {
   font-weight: 800;
 }
 
+textarea {
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  color: var(--text);
+  padding: 9px 10px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 select:focus-visible,
 button:focus-visible,
 input[type=text]:focus-visible,
 input[type=file]:focus-visible,
 input[type=range]:focus-visible,
+textarea:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--deep);
   outline-offset: 2px;
@@ -320,6 +335,11 @@ a:focus-visible {
 .mini-btn:hover {
   background: var(--deep);
   color: #15200c;
+}
+
+.mini-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .fk-title,
@@ -480,7 +500,8 @@ a:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.math-card .row b {
+.math-card .row b,
+.training-stats .row b {
   text-align: right;
   overflow-wrap: anywhere;
 }

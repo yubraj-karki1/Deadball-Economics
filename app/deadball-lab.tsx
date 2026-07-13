@@ -48,8 +48,33 @@ type LabState = {
 };
 
 type SavedScenario = { id: string; name: string; state: LabState; createdAt: number; updatedAt: number };
-type TrainedModel = { id: string; name: string; calibration: Required<ModelCalibration>; rows: number; goalRate: number; loss: number; createdAt: number };
-type TrainingReport = { rows: number; goals: number; goalRate: number; loss: number; model: TrainedModel } | { error: string };
+type TrainingRow = { goal: number; features: number[] };
+type SkipReason = "missingGoal" | "missingShotX" | "missingShotY" | "invalidNumber";
+type TrainingMetrics = { rows: number; goals: number; goalRate: number; loss: number; brier: number; accuracy: number; auc: number };
+type DataQuality = { total: number; valid: number; skipped: number; missingGoal: number; missingShotX: number; missingShotY: number; invalidNumber: number };
+type FeatureImportance = { name: string; label: string; weight: number; share: number; direction: string };
+type ModelConfidence = { label: "Low" | "Medium" | "High"; score: number; reasons: string[] };
+type PsxgTraining = { rows: number; predicted: number; actual: number; suggestedGkReaction: number };
+type TrainedModel = {
+  id: string;
+  name: string;
+  calibration: Required<ModelCalibration>;
+  rows: number;
+  goalRate: number;
+  loss: number;
+  train?: TrainingMetrics;
+  test?: TrainingMetrics;
+  coefficients?: number[];
+  features?: string[];
+  quality?: DataQuality;
+  importance?: FeatureImportance[];
+  confidence?: ModelConfidence;
+  warnings?: string[];
+  psxg?: PsxgTraining;
+  notes?: string;
+  createdAt: number;
+};
+type TrainingReport = { rows: number; skipped: number; quality: DataQuality; train: TrainingMetrics; test: TrainingMetrics; confidence: ModelConfidence; warnings: string[]; model: TrainedModel } | { error: string };
 
 type PsxgCalc = {
   psxg: number;
@@ -267,13 +292,32 @@ function readTrainedModels() {
       if (!item || typeof item !== "object") return [];
       const raw = item as Partial<TrainedModel>;
       if (typeof raw.id !== "string" || typeof raw.name !== "string") return [];
+      const fallbackMetrics: TrainingMetrics = {
+        rows: numberOr(raw.rows, 0),
+        goals: Math.round(numberOr(raw.rows, 0) * numberOr(raw.goalRate, 0)),
+        goalRate: numberOr(raw.goalRate, 0),
+        loss: numberOr(raw.loss, 0),
+        brier: 0,
+        accuracy: 0,
+        auc: 0,
+      };
       return [{
         id: raw.id,
         name: raw.name,
         calibration: calibrationOr(raw.calibration),
-        rows: numberOr(raw.rows, 0),
-        goalRate: numberOr(raw.goalRate, 0),
-        loss: numberOr(raw.loss, 0),
+        rows: fallbackMetrics.rows,
+        goalRate: fallbackMetrics.goalRate,
+        loss: fallbackMetrics.loss,
+        train: raw.train ?? fallbackMetrics,
+        test: raw.test ?? fallbackMetrics,
+        coefficients: Array.isArray(raw.coefficients) && raw.coefficients.every((value) => typeof value === "number") ? raw.coefficients : undefined,
+        features: Array.isArray(raw.features) && raw.features.every((value) => typeof value === "string") ? raw.features : undefined,
+        quality: raw.quality,
+        importance: raw.importance,
+        confidence: raw.confidence,
+        warnings: Array.isArray(raw.warnings) && raw.warnings.every((value) => typeof value === "string") ? raw.warnings : undefined,
+        psxg: raw.psxg,
+        notes: typeof raw.notes === "string" ? raw.notes : "",
         createdAt: numberOr(raw.createdAt, Date.now()),
       }];
     });
@@ -332,6 +376,10 @@ function csvNumber(row: Record<string, string>, names: string[]) {
   return null;
 }
 
+function csvHasValue(row: Record<string, string>, names: string[]) {
+  return names.some((name) => row[name] != null && row[name] !== "");
+}
+
 function csvGoal(row: Record<string, string>) {
   const raw = (row.goal ?? row.is_goal ?? row.scored ?? row.outcome ?? row.result ?? "").trim().toLowerCase();
   if (["1", "true", "yes", "goal", "scored"].includes(raw)) return 1;
@@ -340,15 +388,20 @@ function csvGoal(row: Record<string, string>) {
   return numeric === 1 ? 1 : numeric === 0 ? 0 : null;
 }
 
-function rowTrainingFeatures(row: Record<string, string>) {
+const SHOT_X_COLUMNS = ["shot_x", "x", "location_x"];
+const SHOT_Y_COLUMNS = ["shot_y", "y", "location_y"];
+
+function validateTrainingRow(row: Record<string, string>): { data: TrainingRow } | { reason: SkipReason } {
   const goal = csvGoal(row);
-  const rawX = csvNumber(row, ["shot_x", "x", "location_x"]);
-  const rawY = csvNumber(row, ["shot_y", "y", "location_y"]);
-  if (goal == null || rawX == null || rawY == null) return null;
+  const rawX = csvNumber(row, SHOT_X_COLUMNS);
+  const rawY = csvNumber(row, SHOT_Y_COLUMNS);
+  if (goal == null) return { reason: "missingGoal" as const };
+  if (rawX == null) return { reason: csvHasValue(row, SHOT_X_COLUMNS) ? "invalidNumber" as const : "missingShotX" as const };
+  if (rawY == null) return { reason: csvHasValue(row, SHOT_Y_COLUMNS) ? "invalidNumber" as const : "missingShotY" as const };
 
   const x = rawX <= P_L ? rawX * 120 / P_L : rawX;
   const y = rawY <= P_W ? rawY * 80 / P_W : rawY;
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return { reason: "invalidNumber" as const };
 
   const distance = Math.hypot(120 - x, 40 - y);
   const centrality = Math.abs(y - 40);
@@ -358,7 +411,7 @@ function rowTrainingFeatures(row: Record<string, string>) {
   const knuckle = (csvNumber(row, ["shot_knuckle", "knuckle"]) ?? 0) / 100;
   const speed = clamp(((csvNumber(row, ["shot_speed", "speed"]) ?? 85) - 40) / 100, 0, 1);
 
-  return {
+  const data = {
     goal,
     features: [
       clamp((18 - distance) / 7.5, -2.1, 1.8),
@@ -367,34 +420,194 @@ function rowTrainingFeatures(row: Record<string, string>) {
       clamp(curve, 0, 1) * 0.14 + clamp(dip, 0, 1) * 0.32 + clamp(knuckle, 0, 1) * 0.18 + speed * 0.08,
     ],
   };
+
+  return { data };
+}
+
+function rowTrainingFeatures(row: Record<string, string>): TrainingRow | null {
+  const validated = validateTrainingRow(row);
+  return "data" in validated ? validated.data : null;
+}
+
+function dataQuality(parsedRows: Array<Record<string, string>>) {
+  const quality: DataQuality = { total: parsedRows.length, valid: 0, skipped: 0, missingGoal: 0, missingShotX: 0, missingShotY: 0, invalidNumber: 0 };
+  const rows: TrainingRow[] = [];
+
+  parsedRows.forEach((row) => {
+    const validated = validateTrainingRow(row);
+    if ("data" in validated) {
+      quality.valid += 1;
+      rows.push(validated.data);
+    } else {
+      quality.skipped += 1;
+      quality[validated.reason] += 1;
+    }
+  });
+
+  return { quality, rows };
+}
+
+function seededShuffle<T>(items: T[]) {
+  const copy = [...items];
+  let seed = 1337;
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    const j = seed % (i + 1);
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function predictTrainingRow(weights: number[], features: number[]) {
+  return clamp(sigmoid(weights[0] + features.reduce((sum, feature, i) => sum + weights[i + 1] * feature, 0)), 0.001, 0.999);
+}
+
+function aucScore(scored: Array<{ goal: number; p: number }>) {
+  const positives = scored.filter((item) => item.goal === 1).length;
+  const negatives = scored.length - positives;
+  if (!positives || !negatives) return 0.5;
+
+  const ranked = [...scored].sort((a, b) => a.p - b.p);
+  let rankSum = 0;
+  ranked.forEach((item, index) => {
+    if (item.goal === 1) rankSum += index + 1;
+  });
+
+  return (rankSum - positives * (positives + 1) / 2) / (positives * negatives);
+}
+
+function trainingMetrics(rows: TrainingRow[], weights: number[]): TrainingMetrics {
+  const scored = rows.map((row) => ({ goal: row.goal, p: predictTrainingRow(weights, row.features) }));
+  const goals = rows.reduce((sum, row) => sum + row.goal, 0);
+  const loss = scored.reduce((sum, row) => sum - (row.goal * Math.log(row.p) + (1 - row.goal) * Math.log(1 - row.p)), 0) / rows.length;
+  const brier = scored.reduce((sum, row) => sum + (row.p - row.goal) ** 2, 0) / rows.length;
+  const accuracy = scored.filter((row) => (row.p >= 0.5 ? 1 : 0) === row.goal).length / rows.length;
+
+  return {
+    rows: rows.length,
+    goals,
+    goalRate: goals / rows.length,
+    loss,
+    brier,
+    accuracy,
+    auc: aucScore(scored),
+  };
+}
+
+const TRAINING_FEATURES = [
+  { name: "distance", label: "Distance", direction: "closer shots" },
+  { name: "angle", label: "Angle", direction: "central angle" },
+  { name: "wall", label: "Wall pressure", direction: "wall blocks" },
+  { name: "craft", label: "FK craft", direction: "curve/dip/knuckle" },
+];
+
+function featureImportance(weights: number[]): FeatureImportance[] {
+  const raw = TRAINING_FEATURES.map((feature, i) => ({
+    ...feature,
+    weight: weights[i + 1] ?? 0,
+  }));
+  const total = raw.reduce((sum, feature) => sum + Math.abs(feature.weight), 0) || 1;
+
+  return raw
+    .map((feature) => ({ ...feature, share: Math.abs(feature.weight) / total }))
+    .sort((a, b) => b.share - a.share);
+}
+
+function modelConfidence(train: TrainingMetrics, test: TrainingMetrics, quality: DataQuality): ModelConfidence {
+  const lossGap = Math.max(0, test.loss - train.loss);
+  const skippedRate = quality.total ? quality.skipped / quality.total : 0;
+  const rowsScore = clamp(test.rows / 500, 0, 1) * 30;
+  const aucScorePart = clamp((test.auc - 0.5) / 0.35, 0, 1) * 35;
+  const lossGapScore = clamp(1 - lossGap / 0.16, 0, 1) * 20;
+  const qualityScore = clamp(1 - skippedRate / 0.35, 0, 1) * 15;
+  const score = Math.round(rowsScore + aucScorePart + lossGapScore + qualityScore);
+  const reasons = [
+    `${test.rows} test rows`,
+    `AUC ${fmt(test.auc)}`,
+    `loss gap ${fmt(lossGap)}`,
+    `${pct(skippedRate)} skipped`,
+  ];
+
+  return { label: score >= 76 ? "High" : score >= 52 ? "Medium" : "Low", score, reasons };
+}
+
+function modelWarnings(train: TrainingMetrics, test: TrainingMetrics, quality: DataQuality, psxg?: PsxgTraining) {
+  const warnings: string[] = [];
+  const skippedRate = quality.total ? quality.skipped / quality.total : 0;
+  if (test.rows < 120) warnings.push("Small test sample");
+  if (test.auc < 0.65) warnings.push("Weak test AUC");
+  if (test.loss - train.loss > 0.12) warnings.push("Possible overfit");
+  if (skippedRate > 0.25) warnings.push("Many skipped rows");
+  if (test.goalRate < 0.03 || test.goalRate > 0.35) warnings.push("Unusual goal rate");
+  if (!psxg) warnings.push("PSxG needs ball_x, ball_y, gk_x and gk_y columns");
+  return warnings;
+}
+
+function psxgTrainingFromCsv(parsedRows: Array<Record<string, string>>): PsxgTraining | undefined {
+  const scored = parsedRows.flatMap((row) => {
+    const goal = csvGoal(row);
+    const rawShotX = csvNumber(row, SHOT_X_COLUMNS);
+    const rawShotY = csvNumber(row, SHOT_Y_COLUMNS);
+    const ballX = csvNumber(row, ["ball_x", "goal_x", "post_shot_x", "end_x"]);
+    const ballY = csvNumber(row, ["ball_y", "goal_y", "post_shot_y", "end_y"]);
+    const gkX = csvNumber(row, ["gk_x", "keeper_x", "goalkeeper_x"]);
+    const gkY = csvNumber(row, ["gk_y", "keeper_y", "goalkeeper_y"]);
+    if (goal == null || rawShotX == null || rawShotY == null || ballX == null || ballY == null || gkX == null || gkY == null) return [];
+
+    const shot: Point = rawShotX <= P_L ? [rawShotX, rawShotY <= P_W ? rawShotY : rawShotY * P_W / 80] : [rawShotX * P_L / 120, rawShotY * P_W / 80];
+    const ball: Point = [clamp(ballX <= 1 ? ballX * GOAL_W : ballX, 0.01, GOAL_W - 0.01), clamp(ballY <= 1 ? ballY * GOAL_H : ballY, 0.01, GOAL_H - 0.01)];
+    const gk: Point = [clamp(gkX <= 1 ? gkX * GOAL_W : gkX, 0.5, GOAL_W - 0.5), clamp(gkY <= 1 ? gkY * GOAL_H : gkY, 0, 1.5)];
+    const speed = csvNumber(row, ["shot_speed", "speed"]) ?? 85;
+    const curve = Math.abs(csvNumber(row, ["shot_curve", "curve"]) ?? 0) / 100;
+    const dip = (csvNumber(row, ["shot_dip", "dip"]) ?? 0) / 100;
+    const knuckle = (csvNumber(row, ["shot_knuckle", "knuckle"]) ?? 0) / 100;
+    const craft = Math.min(0.18, curve * 0.055 + clamp(dip, 0, 1) * 0.08 + clamp(knuckle, 0, 1) * 0.07);
+
+    return [{ goal, psxg: calcPhysics(ball, gk, speed, distM(shot), craft).psxg }];
+  });
+
+  if (scored.length < 20) return undefined;
+
+  const predicted = scored.reduce((sum, row) => sum + row.psxg, 0) / scored.length;
+  const actual = scored.reduce((sum, row) => sum + row.goal, 0) / scored.length;
+  return {
+    rows: scored.length,
+    predicted,
+    actual,
+    suggestedGkReaction: clamp(1 + (actual - predicted) * 1.8, 0.25, 2),
+  };
 }
 
 function trainCalibrationFromCsv(text: string, name: string): TrainingReport {
-  const rows = parseCsv(text).map(rowTrainingFeatures).filter((row): row is NonNullable<ReturnType<typeof rowTrainingFeatures>> => row != null);
-  if (rows.length < 12) return { error: "Need at least 12 valid rows with goal, shot_x and shot_y columns." };
+  const parsedRows = parseCsv(text);
+  const { quality, rows } = dataQuality(parsedRows);
+  if (rows.length < 30) return { error: "Need at least 30 valid rows with goal, shot_x and shot_y columns." };
 
+  const shuffled = seededShuffle(rows);
+  const splitIndex = Math.max(12, Math.floor(shuffled.length * 0.8));
+  const trainRows = shuffled.slice(0, splitIndex);
+  const testRows = shuffled.slice(splitIndex);
   let weights = [0, 1, 1, 1, 1];
   const learningRate = 0.08;
   const l2 = 0.002;
 
   for (let step = 0; step < 650; step += 1) {
     const gradients = [0, 0, 0, 0, 0];
-    for (const row of rows) {
-      const z = weights[0] + row.features.reduce((sum, feature, i) => sum + weights[i + 1] * feature, 0);
-      const error = sigmoid(z) - row.goal;
+    for (const row of trainRows) {
+      const error = predictTrainingRow(weights, row.features) - row.goal;
       gradients[0] += error;
       row.features.forEach((feature, i) => {
         gradients[i + 1] += error * feature + l2 * weights[i + 1];
       });
     }
-    weights = weights.map((weight, i) => weight - learningRate * gradients[i] / rows.length);
+    weights = weights.map((weight, i) => weight - learningRate * gradients[i] / trainRows.length);
   }
 
-  const loss = rows.reduce((sum, row) => {
-    const z = weights[0] + row.features.reduce((total, feature, i) => total + weights[i + 1] * feature, 0);
-    const p = clamp(sigmoid(z), 0.001, 0.999);
-    return sum - (row.goal * Math.log(p) + (1 - row.goal) * Math.log(1 - p));
-  }, 0) / rows.length;
+  const train = trainingMetrics(trainRows, weights);
+  const test = trainingMetrics(testRows.length ? testRows : trainRows, weights);
+  const psxg = psxgTrainingFromCsv(parsedRows);
+  const confidence = modelConfidence(train, test, quality);
+  const warnings = modelWarnings(train, test, quality, psxg);
   const goals = rows.reduce((sum, row) => sum + row.goal, 0);
 
   const calibration: Required<ModelCalibration> = {
@@ -402,7 +615,7 @@ function trainCalibrationFromCsv(text: string, name: string): TrainingReport {
     angleWeight: clamp(Math.abs(weights[2]), 0.25, 2),
     wallPenalty: clamp(Math.abs(weights[3]), 0.25, 2),
     craftBonus: clamp(Math.abs(weights[4]), 0.25, 2),
-    gkReaction: 1,
+    gkReaction: psxg?.suggestedGkReaction ?? 1,
   };
   const model: TrainedModel = {
     id: makeScenarioId(),
@@ -410,11 +623,21 @@ function trainCalibrationFromCsv(text: string, name: string): TrainingReport {
     calibration,
     rows: rows.length,
     goalRate: goals / rows.length,
-    loss,
+    loss: test.loss,
+    train,
+    test,
+    coefficients: weights.map((weight) => +weight.toFixed(5)),
+    features: TRAINING_FEATURES.map((feature) => feature.name),
+    quality,
+    importance: featureImportance(weights),
+    confidence,
+    warnings,
+    psxg,
+    notes: "",
     createdAt: Date.now(),
   };
 
-  return { rows: rows.length, goals, goalRate: goals / rows.length, loss, model };
+  return { rows: rows.length, skipped: quality.skipped, quality, train, test, confidence, warnings, model };
 }
 
 function calcPhysics(ball: Point, gk: Point, speed: number, shotDistance: number, craftBonus = 0, calibration: Required<ModelCalibration> = DEFAULT_CALIBRATION): PsxgCalc {
@@ -798,6 +1021,56 @@ export default function DeadballLab() {
     persistTrainedModels(next);
     setSelectedModelId(next[0]?.id ?? "");
   };
+  const exportTrainedModel = () => {
+    const model = trainedModels.find((item) => item.id === selectedModelId);
+    if (!model) return;
+    const blob = new Blob([JSON.stringify(model, null, 2)], { type: "application/json" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${model.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "trained-model"}.json`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+  const importTrainedModel = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    try {
+      const parsed = JSON.parse(await file.text()) as Partial<TrainedModel>;
+      if (typeof parsed.name !== "string" || !parsed.calibration) {
+        setTrainingReport({ error: "That JSON file is not a valid trained model." });
+        return;
+      }
+      const model: TrainedModel = {
+        id: typeof parsed.id === "string" ? parsed.id : makeScenarioId(),
+        name: parsed.name.slice(0, 64),
+        calibration: calibrationOr(parsed.calibration),
+        rows: numberOr(parsed.rows, 0),
+        goalRate: numberOr(parsed.goalRate, 0),
+        loss: numberOr(parsed.loss, 0),
+        train: parsed.train,
+        test: parsed.test,
+        coefficients: parsed.coefficients,
+        features: parsed.features,
+        quality: parsed.quality,
+        importance: parsed.importance,
+        confidence: parsed.confidence,
+        warnings: parsed.warnings,
+        psxg: parsed.psxg,
+        notes: typeof parsed.notes === "string" ? parsed.notes : "",
+        createdAt: numberOr(parsed.createdAt, Date.now()),
+      };
+      const next = [model, ...trainedModels.filter((item) => item.id !== model.id)];
+      persistTrainedModels(next);
+      setSelectedModelId(model.id);
+      setModelName(model.name);
+      setTrainingReport(null);
+    } catch {
+      setTrainingReport({ error: "Could not read that trained model JSON file." });
+    }
+  };
   const trainFromCsv = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -811,7 +1084,29 @@ export default function DeadballLab() {
     persistTrainedModels(next);
     setSelectedModelId(report.model.id);
     setModelName(report.model.name);
-    update({ calibration: report.model.calibration });
+  };
+  const downloadCsvTemplate = () => {
+    const template = [
+      "goal,shot_x,shot_y,wall_size,shot_curve,shot_dip,shot_knuckle,shot_speed,ball_x,ball_y,gk_x,gk_y",
+      "1,84,32,4,62,58,12,92,6.7,1.8,3.55,0.45",
+      "0,101.5,31.5,0,0,0,0,78,3.1,1.2,3.66,0.5",
+    ].join("\n");
+    const blob = new Blob([template], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "deadball-training-template.csv";
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+  const resetDefaultModel = () => {
+    update({ calibration: DEFAULT_CALIBRATION });
+    setSelectedModelId("");
+  };
+  const updateSelectedModelNotes = (notes: string) => {
+    if (!selectedModelId) return;
+    const next = trainedModels.map((model) => model.id === selectedModelId ? { ...model, notes } : model);
+    persistTrainedModels(next);
   };
   const pitchPoint = (e: PointerEvent<SVGSVGElement>): Point => {
     const r = pitchRef.current!.getBoundingClientRect();
@@ -858,6 +1153,7 @@ export default function DeadballLab() {
   const [ballSvgX, ballSvgY] = goalPointToSvg(state.ball);
   const [gkSvgX, gkSvgY] = goalPointToSvg(state.gkf);
   const xgSolution = xgMath(result, state, modelShot, isDirect, state.calibration);
+  const selectedTrainedModel = trainedModels.find((model) => model.id === selectedModelId) ?? null;
   const defaultModelResult = useMemo(() => {
     const [shot_x, shot_y] = toSB(modelShot);
     return predict({
@@ -879,6 +1175,33 @@ export default function DeadballLab() {
       calibration: DEFAULT_CALIBRATION,
     });
   }, [directFoot, effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
+  const selectedModelResult = useMemo(() => {
+    if (!selectedTrainedModel) return null;
+    const [shot_x, shot_y] = toSB(modelShot);
+    return predict({
+      setpiece_type: state.spType,
+      shot_x,
+      shot_y,
+      gk: toSB(state.gk),
+      defenders: [...state.defenders, ...wallPlayers].map(toSB),
+      attackers: state.attackers.map(toSB),
+      delivery_technique: isDirect ? "" : state.swing,
+      delivery_height: isDirect ? "" : state.height,
+      corner_side: state.spType === "corner-right" ? "right" : state.spType === "corner-left" ? "left" : "",
+      body_part: isDirect ? directFoot : state.body,
+      shot_type: isDirect ? "Free Kick" : "",
+      shot_speed: isDirect ? state.shotSpeed : undefined,
+      shot_curve: isDirect ? effectiveCurve : undefined,
+      shot_dip: isDirect ? state.dip : undefined,
+      shot_knuckle: isDirect ? state.knuckle : undefined,
+      calibration: selectedTrainedModel.calibration,
+    });
+  }, [directFoot, effectiveCurve, isDirect, modelShot, selectedTrainedModel, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
+  const selectedModelPsxg = selectedTrainedModel ? calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus, selectedTrainedModel.calibration) : null;
+  const selectedCombined = selectedModelResult && selectedModelPsxg ? selectedModelResult.xg * selectedModelPsxg.psxg : null;
+  const selectedXgDelta = selectedModelResult ? selectedModelResult.xg - defaultModelResult.xg : null;
+  const confidence = selectedTrainedModel?.confidence ?? (selectedTrainedModel?.train && selectedTrainedModel?.test && selectedTrainedModel?.quality ? modelConfidence(selectedTrainedModel.train, selectedTrainedModel.test, selectedTrainedModel.quality) : null);
+  const retrainWarnings = selectedTrainedModel?.warnings ?? [];
   const recommendation = result ? recommendationFor(result, combined, isDirect) : "Move the shot marker or load a preset to generate a tactical read.";
 
   return (
@@ -966,27 +1289,26 @@ export default function DeadballLab() {
             <button className={`btn toggle ${state.showHeat ? "on" : ""}`} onClick={() => update({ showHeat: !state.showHeat })}>xG heatmap</button>
             <button className={`btn toggle ${state.showVor ? "on" : ""}`} onClick={() => update({ showVor: !state.showVor })}>Voronoi</button>
           </div>
-          <div className="calibration-card open">
-            <div className="panel-row-title">
-              <span className="fk-title">Model calibration</span>
-              <button className="mini-btn" onClick={() => update({ calibration: DEFAULT_CALIBRATION })}>Reset</button>
-            </div>
-            <Slider label="Distance weight" value={state.calibration.distanceWeight} min={0.25} max={2} step={0.05} onChange={(distanceWeight) => updateCalibration({ distanceWeight })} suffix="x" />
-            <Slider label="Angle weight" value={state.calibration.angleWeight} min={0.25} max={2} step={0.05} onChange={(angleWeight) => updateCalibration({ angleWeight })} suffix="x" />
-            <Slider label="Wall penalty" value={state.calibration.wallPenalty} min={0.25} max={2} step={0.05} onChange={(wallPenalty) => updateCalibration({ wallPenalty })} suffix="x" />
-            <Slider label="Direct FK craft" value={state.calibration.craftBonus} min={0.25} max={2} step={0.05} onChange={(craftBonus) => updateCalibration({ craftBonus })} suffix="x" />
-            <Slider label="GK reaction" value={state.calibration.gkReaction} min={0.25} max={2} step={0.05} onChange={(gkReaction) => updateCalibration({ gkReaction })} suffix="x" />
-          </div>
           <div className="training-card open">
-            <div className="fk-title">Retrain model</div>
+            <div className="panel-row-title">
+              <div className="fk-title">Retrain model</div>
+            </div>
             <label>Model name
               <input type="text" value={modelName} maxLength={64} onChange={(e) => setModelName(e.target.value)} />
             </label>
             <label>Training CSV
               <input type="file" accept=".csv,text/csv" onChange={trainFromCsv} />
             </label>
+            <label>Import model JSON
+              <input type="file" accept=".json,application/json" onChange={importTrainedModel} />
+            </label>
             <div className="tool-row">
+              <button className="btn" onClick={downloadCsvTemplate}>CSV template</button>
+              <button className="btn" onClick={resetDefaultModel}>Reset model</button>
+            </div>
+            <div className="scenario-actions">
               <button className="btn" onClick={() => applyTrainedModel()} disabled={!selectedModelId}>Apply</button>
+              <button className="btn" onClick={exportTrainedModel} disabled={!selectedModelId}>Export</button>
               <button className="btn danger" onClick={deleteTrainedModel} disabled={!selectedModelId}>Delete</button>
             </div>
             <label>Trained models
@@ -1000,12 +1322,39 @@ export default function DeadballLab() {
                 {trainedModels.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
               </select>
             </label>
+            <label>Model notes
+              <textarea value={selectedTrainedModel?.notes ?? ""} onChange={(e) => updateSelectedModelNotes(e.target.value)} placeholder="Dataset, league, season, filter..." disabled={!selectedTrainedModel} />
+            </label>
             <div className="training-stats">
-              <Row k="Default / active xG" v={`${pct(defaultModelResult.xg)} / ${pct(result?.xg)}`} />
+              <Row k="Default / selected" v={`${pct(defaultModelResult.xg)} / ${selectedModelResult ? pct(selectedModelResult.xg) : "--"}`} />
+              <Row k="Before / after" v={selectedModelResult && selectedXgDelta != null ? `${pct(defaultModelResult.xg)} -> ${pct(selectedModelResult.xg)} (${signed(selectedXgDelta * 100, 1)} pts)` : "--"} />
+              <Row k="Active xG" v={pct(result?.xg)} />
+              <Row k="PSxG preview" v={selectedModelPsxg ? `${pct(psxg.psxg)} -> ${pct(selectedModelPsxg.psxg)}` : "--"} />
+              <Row k="Combined preview" v={selectedCombined != null ? pct(selectedCombined) : "--"} />
+              {confidence && <Row k="Confidence" v={`${confidence.label} (${confidence.score}/100)`} />}
+              {selectedTrainedModel?.test && <>
+                <Row k="Test loss / Brier" v={`${fmt(selectedTrainedModel.test.loss)} / ${fmt(selectedTrainedModel.test.brier)}`} />
+                <Row k="Test acc / AUC" v={`${pct(selectedTrainedModel.test.accuracy)} / ${fmt(selectedTrainedModel.test.auc)}`} />
+              </>}
+              {selectedTrainedModel?.quality && <>
+                <Row k="Data quality" v={`${selectedTrainedModel.quality.valid} valid / ${selectedTrainedModel.quality.skipped} skipped`} />
+                <Row k="Skip reasons" v={`goal ${selectedTrainedModel.quality.missingGoal}, x ${selectedTrainedModel.quality.missingShotX}, y ${selectedTrainedModel.quality.missingShotY}, number ${selectedTrainedModel.quality.invalidNumber}`} />
+              </>}
+              {selectedTrainedModel?.importance?.slice(0, 4).map((feature) => (
+                <Row key={feature.name} k={feature.label} v={`${pct(feature.share)} (${feature.direction})`} />
+              ))}
+              {selectedTrainedModel?.psxg && <Row k="PSxG training" v={`${selectedTrainedModel.psxg.rows} rows, GK reaction ${fmt(selectedTrainedModel.psxg.suggestedGkReaction, 2)}x`} />}
+              {retrainWarnings.length > 0 && <Row k="Warnings" v={retrainWarnings.join(", ")} />}
               {trainingReport && "error" in trainingReport && <Row k="Training" v={trainingReport.error} />}
               {trainingReport && !("error" in trainingReport) && <>
-                <Row k="Rows / goals" v={`${trainingReport.rows} / ${trainingReport.goals}`} />
-                <Row k="Goal rate / loss" v={`${pct(trainingReport.goalRate)} / ${fmt(trainingReport.loss)}`} />
+                <Row k="Rows / skipped" v={`${trainingReport.rows} / ${trainingReport.skipped}`} />
+                <Row k="Skipped reasons" v={`goal ${trainingReport.quality.missingGoal}, x ${trainingReport.quality.missingShotX}, y ${trainingReport.quality.missingShotY}, number ${trainingReport.quality.invalidNumber}`} />
+                <Row k="Train / test rows" v={`${trainingReport.train.rows} / ${trainingReport.test.rows}`} />
+                <Row k="Goal rate" v={`${pct(trainingReport.train.goalRate)} train / ${pct(trainingReport.test.goalRate)} test`} />
+                <Row k="Train / test loss" v={`${fmt(trainingReport.train.loss)} / ${fmt(trainingReport.test.loss)}`} />
+                <Row k="Test accuracy / AUC" v={`${pct(trainingReport.test.accuracy)} / ${fmt(trainingReport.test.auc)}`} />
+                <Row k="New confidence" v={`${trainingReport.confidence.label} (${trainingReport.confidence.score}/100)`} />
+                {trainingReport.warnings.length > 0 && <Row k="New warnings" v={trainingReport.warnings.join(", ")} />}
               </>}
             </div>
           </div>
