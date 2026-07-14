@@ -1,8 +1,9 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/calculate_xg_grid/route": "app/api/calculate_xg_grid/route.js",
   "/api/calculate_xg/route": "app/api/calculate_xg/route.js",
+  "/api/calculate_xg_grid/route": "app/api/calculate_xg_grid/route.js",
   "/api/health/route": "app/api/health/route.js",
   "/page": "app/page.js",
-  "/retrain/page": "app/retrain/page.js"
+  "/retrain/page": "app/retrain/page.js",
+  "/calculations/page": "app/calculations/page.js"
 }

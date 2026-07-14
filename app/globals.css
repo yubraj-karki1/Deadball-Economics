@@ -183,6 +183,64 @@ h1 {
   top: 18px;
 }
 
+.grid.calculation-view {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 1180px;
+  min-height: calc(100vh - 152px);
+}
+
+.calculation-view > .controls,
+.calculation-view > .cards,
+.calculation-view .pitchpanel > .pitch,
+.calculation-view .pitchpanel > .legend,
+.calculation-view .psxgpanel > .goalframe,
+.calculation-view .psxgpanel > label,
+.calculation-view .psxgpanel > .metrics,
+.calculation-view .psxgpanel > .formula-live {
+  display: none;
+}
+
+.calculation-view .pitchpanel,
+.calculation-view .psxgpanel {
+  overflow: visible;
+}
+
+.calculation-view .pitch-math-grid {
+  grid-template-columns: 1fr;
+  margin-top: 12px;
+}
+
+.calculation-view .psxg-calculation {
+  margin-top: 12px;
+}
+
+.calculation-hero {
+  display: grid;
+  gap: 5px;
+  padding: 18px;
+  border: 1px solid rgba(215, 242, 92, 0.18);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(215, 242, 92, 0.1), rgba(45, 212, 191, 0.04));
+}
+
+.calculation-hero span,
+.calculation-hero small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.calculation-hero b {
+  color: var(--deep);
+  font-size: clamp(44px, 6vw, 72px);
+  line-height: 1;
+}
+
+.psxg-hero {
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.1), rgba(215, 242, 92, 0.04));
+}
+
 .panel,
 .card {
   background: linear-gradient(180deg, rgba(24, 35, 29, 0.98), rgba(10, 15, 12, 0.98));
@@ -598,6 +656,18 @@ a:focus-visible {
 
   .retrain-view > .cards .insight {
     grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 900px) {
+  .grid.calculation-view {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .calculation-view .pitchpanel,
+  .calculation-view .psxgpanel {
+    width: 100%;
   }
 }
 

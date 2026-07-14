@@ -12,7 +12,7 @@ import { modelConfidence, trainCalibrationFromCsv } from "../features/lab/traini
 import type { DragTarget, GoalDrag, LabState, PresetKey, SavedScenario, TrainedModel, TrainingReport } from "../features/lab/types";
 import { clamp, distM, heatColor, isAbortError, pct, toSB } from "../features/lab/utils";
 
-export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain" }) {
+export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain" | "calculations" }) {
   const [state, setState] = useState<LabState>(initialState);
   const [scenarioName, setScenarioName] = useState("Near-post corner");
   const [activePreset, setActivePreset] = useState<PresetKey | null>("nearPost");
@@ -423,25 +423,26 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
       <header className="topbar">
         <div>
           <h1>TactiSet <span className="tag">Set-piece xG</span></h1>
-          <p className="sub">{view === "retrain" ? "Train, validate, compare, and manage custom set-piece models." : "A tactical set-piece lab rebuilt as a Next.js and React TypeScript app."}</p>
+          <p className="sub">{view === "retrain" ? "Train, validate, compare, and manage custom set-piece models." : view === "calculations" ? "Inspect the live xG, PSxG, and combined probability calculations." : "A tactical set-piece lab rebuilt as a Next.js and React TypeScript app."}</p>
         </div>
         <div className="top-actions">
           <span className="model-pill">36,055 source shots</span>
-          {view === "retrain" && <a className="health" href="/">Back to lab</a>}
+          {view !== "lab" && <a className="health" href="/">Back to lab</a>}
           <a className="health" href="/api/health" target="_blank">API health</a>
         </div>
       </header>
 
       <section className="scenario-strip">
-        {(Object.keys(PRESETS) as PresetKey[]).map((key) => view === "lab" ? (
+        {(Object.keys(PRESETS) as PresetKey[]).map((key) => view !== "retrain" ? (
           <button key={key} className={`preset ${activePreset === key ? "on" : ""}`} onClick={() => applyPreset(key)}>{PRESETS[key].name}</button>
         ) : (
           <a key={key} className="preset scenario-link" href="/">{PRESETS[key].name}</a>
         ))}
         <a className={`preset scenario-link ${view === "retrain" ? "on" : ""}`} href="/retrain">Retrain model</a>
+        <a className={`preset scenario-link ${view === "calculations" ? "on" : ""}`} href="/calculations">xG &amp; PSxG calculations</a>
       </section>
 
-      <main className={`grid ${view === "retrain" ? "retrain-view" : ""}`}>
+      <main className={`grid ${view === "retrain" ? "retrain-view" : view === "calculations" ? "calculation-view" : ""}`}>
         <aside className="panel controls">
           <div className="panel-head"><span>Scenario</span><b>{scenarioName}</b></div>
           <div className="scenario-library">
@@ -580,7 +581,8 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
         </aside>
 
         <section className="panel pitchpanel">
-          <div className="panel-head"><span>Live pitch</span><b>Drag to edit</b></div>
+          <div className="panel-head"><span>{view === "calculations" ? "Expected goals" : "Live pitch"}</span><b>{view === "calculations" ? "xG model" : "Drag to edit"}</b></div>
+          {view === "calculations" && <div className="calculation-hero"><span>Current shot xG</span><b>{pct(result?.xg)}</b><small>{result?.zone ?? "Calculating"} · {fmt(result?.distance_to_goal ?? distM(modelShot), 1)} m</small></div>}
           <svg ref={pitchRef} viewBox="55 0 50 68" preserveAspectRatio="xMidYMid meet" className="pitch" onPointerMove={onPitchMove}>
             <PitchMarks />
             {state.showVor && <Voronoi defenders={[...state.defenders, ...wallPlayers]} attackers={state.attackers} gk={state.gk} />}
@@ -618,6 +620,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
 
         <section className="panel psxgpanel">
           <div className="panel-head"><span>Post-shot xG</span><b>GK biomechanics</b></div>
+          {view === "calculations" && <div className="calculation-hero psxg-hero"><span>Current PSxG</span><b>{pct(psxg.psxg)}</b><small>{psxg.diff} · {fmt(psxg.margin)} s margin</small></div>}
           <svg ref={goalRef} viewBox="0 0 764 280" className="goalframe" onPointerMove={onGoalMove}>
             <rect x="11" y="11" width="742" height="254" fill="none" stroke="#fff" strokeWidth="8" rx="2" />
             <rect x="16" y="16" width="732" height="244" fill="rgba(18,92,51,.42)" />
