@@ -5,13 +5,23 @@ export function Player({ p, color, label, radius = 0.95, onPointerDown }: { p: P
   return <g onPointerDown={onPointerDown} className={onPointerDown ? "grab" : undefined}><circle cx={p[0]} cy={p[1]} r={radius} fill={color} stroke="#fff9d6" strokeWidth="0.22" />{label && <text x={p[0]} y={p[1] + 0.35} textAnchor="middle" fontSize="0.9" fill="#15200c" fontWeight="bold">{label}</text>}</g>;
 }
 
-export function GoalkeeperFigure({ x, y, onPointerDown }: { x: number; y: number; onPointerDown: () => void }) {
+export function GoalkeeperFigure({ x, y, targetX, targetY, onPointerDown }: { x: number; y: number; targetX: number; targetY: number; onPointerDown: () => void }) {
+  const shoulderY = y - 78;
+  const dx = targetX - x;
+  const dy = targetY - shoulderY;
+  const horizontalReach = Math.max(-28, Math.min(28, dx * 0.16));
+  const verticalReach = Math.max(-24, Math.min(24, dy * 0.22));
+  const leftHandX = x - 48 + horizontalReach;
+  const leftHandY = y - 46 + verticalReach;
+  const rightHandX = x + 48 + horizontalReach;
+  const rightHandY = y - 46 + verticalReach;
+
   return (
-    <g onPointerDown={onPointerDown} className="grab">
-      <line x1={x - 14} y1={y - 78} x2={x - 44} y2={y - 50} stroke="#ff5a5f" strokeWidth="11" strokeLinecap="round" />
-      <line x1={x + 14} y1={y - 78} x2={x + 44} y2={y - 50} stroke="#ff5a5f" strokeWidth="11" strokeLinecap="round" />
-      <circle cx={x - 49} cy={y - 46} r="9" fill="#fff" stroke="#17241b" strokeWidth="2" />
-      <circle cx={x + 49} cy={y - 46} r="9" fill="#fff" stroke="#17241b" strokeWidth="2" />
+    <g onPointerDown={onPointerDown} className="grab goalkeeper-figure">
+      <line className="gk-arm" x1={x - 14} y1={shoulderY} x2={leftHandX} y2={leftHandY} stroke="#ff5a5f" strokeWidth="11" strokeLinecap="round" />
+      <line className="gk-arm" x1={x + 14} y1={shoulderY} x2={rightHandX} y2={rightHandY} stroke="#ff5a5f" strokeWidth="11" strokeLinecap="round" />
+      <circle className="gk-hand" cx={leftHandX} cy={leftHandY} r="9" fill="#fff" stroke="#17241b" strokeWidth="2" />
+      <circle className="gk-hand" cx={rightHandX} cy={rightHandY} r="9" fill="#fff" stroke="#17241b" strokeWidth="2" />
       <line x1={x - 8} y1={y - 18} x2={x - 24} y2={y + 6} stroke="#17241b" strokeWidth="10" strokeLinecap="round" />
       <line x1={x + 8} y1={y - 18} x2={x + 24} y2={y + 6} stroke="#17241b" strokeWidth="10" strokeLinecap="round" />
       <line x1={x - 24} y1={y + 6} x2={x - 38} y2={y + 6} stroke="#fff" strokeWidth="6" strokeLinecap="round" />
@@ -53,4 +63,3 @@ export function zoneFill(v: number) {
   if (v >= 0.25) return "rgba(45,212,191,.42)";
   return "rgba(34,126,86,.5)";
 }
-

@@ -473,6 +473,7 @@ a:focus-visible {
 
 .grab { cursor: grab; }
 
+
 .legend {
   padding: 10px 2px 0;
   color: var(--muted);

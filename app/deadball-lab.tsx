@@ -632,11 +632,12 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               return <g key={`${c}-${r}`}><rect x={16 + c * 183} y={16 + r * 81.33} width="183" height="81.33" fill={zoneFill(v)} stroke="rgba(255,255,255,.25)" /><text x={16 + c * 183 + 91.5} y={16 + r * 81.33 + 44} textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{v.toFixed(2)}</text></g>;
             }))}
             <ellipse cx={gkSvgX} cy={gkSvgY} rx={Math.max(50, (psxg.ballTime - 0.15) * GK_H * 100)} ry={Math.max(50, (psxg.ballTime - 0.15) * GK_V * 100)} fill="rgba(45,212,191,.16)" stroke="rgba(45,212,191,.9)" strokeDasharray="6 4" />
-            <GoalkeeperFigure x={gkSvgX} y={gkSvgY} onPointerDown={() => setGoalDrag("gk")} />
+            <GoalkeeperFigure x={gkSvgX} y={gkSvgY} targetX={ballSvgX} targetY={ballSvgY} onPointerDown={() => setGoalDrag("gk")} />
             <g onPointerDown={() => setGoalDrag("ball")} className="grab"><circle cx={ballSvgX} cy={ballSvgY} r="16" fill="#fff" stroke="#333" strokeWidth="2" /><text x={ballSvgX} y={ballSvgY + 29} textAnchor="middle" fill="#fff" fontSize="12" fontWeight="bold">BALL</text></g>
           </svg>
           <Slider label="Shot speed" value={state.shotSpeed} min={40} max={140} onChange={(shotSpeed) => update({ shotSpeed })} suffix=" km/h" />
           <div className="metrics">
+            <Metric k="xG" v={pct(result?.xg)} />
             <Metric k="Ball time" v={`${psxg.ballTime.toFixed(3)}s`} />
             <Metric k="GK reach" v={`${psxg.diveTime.toFixed(3)}s`} />
             <Metric k="Margin" v={`${psxg.margin > 0 ? "+" : ""}${psxg.margin.toFixed(3)}s`} />
