@@ -96,3 +96,10 @@
  POST /api/calculate_xg 400 in 14ms
  ✓ Compiled /calculations in 236ms (348 modules)
  GET /calculations 200 in 567ms
+ ✓ Compiled in 668ms (552 modules)
+ ✓ Compiled in 387ms (552 modules)
+ ✓ Compiled in 478ms (552 modules)
+ ✓ Compiled in 350ms (566 modules)
+ ✓ Compiled in 187ms (552 modules)
+ ✓ Compiled in 219ms (566 modules)
+ ✓ Compiled in 411ms (552 modules)
