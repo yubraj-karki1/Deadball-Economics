@@ -196,8 +196,7 @@ h1 {
 .calculation-view .pitchpanel > .legend,
 .calculation-view .psxgpanel > .goalframe,
 .calculation-view .psxgpanel > label,
-.calculation-view .psxgpanel > .metrics,
-.calculation-view .psxgpanel > .formula-live {
+.calculation-view .psxgpanel > .metrics {
   display: none;
 }
 

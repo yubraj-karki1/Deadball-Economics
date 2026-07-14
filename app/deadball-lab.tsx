@@ -78,6 +78,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
 
   useEffect(() => {
     const controller = new AbortController();
+    setResult(null);
     const timer = window.setTimeout(async () => {
       try {
         const [shot_x, shot_y] = toSB(modelShot);
@@ -601,7 +602,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
             </> : <circle cx={directTarget[0]} cy={directTarget[1]} r="0.45" fill="#fff" stroke="#111" strokeWidth="0.2" />}
           </svg>
           <div className="legend"><Legend color="#fff9d6" text="Shot" /><Legend color="#d7f25c" text="Delivery / GK" /><Legend color="#ff5a5f" text="Defenders" /><Legend color="#2dd4bf" text="Attackers" /><Legend color="#f6b73c" text="Wall" /></div>
-          <div className="pitch-math-grid">
+          {view === "calculations" && <div className="pitch-math-grid">
             {xgSolution && <div className="calculation-card math-card">
               <div className="bk-title">xG calculation</div>
               <div className="equation">xG = clamp(1 / (1 + e^(-logit)), 0.006, 0.62)</div>
@@ -615,7 +616,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               <div className="equation">Combined = xG x PSxG</div>
               <Row k="Calculation" v={`${pct(result?.xg)} x ${pct(psxg.psxg)} = ${pct(combined)}`} />
             </div>
-          </div>
+          </div>}
         </section>
 
         <section className="panel psxgpanel">
@@ -643,19 +644,19 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
             <Metric k="Difficulty" v={psxg.diff} />
             <Metric k="PSxG" v={pct(psxg.psxg)} />
           </div>
-          <div className="formula-live">
+          {view === "calculations" && <div className="formula-live">
             <span>Shot distance</span><b>{distM(modelShot).toFixed(2)} m</b>
             <span>Ball time</span><b>{distM(modelShot).toFixed(2)} / {psxg.speedMs.toFixed(2)} = {psxg.ballTime.toFixed(3)} s</b>
             <span>GK dx / dy</span><b>{psxg.hd.toFixed(2)} m / {psxg.vd.toFixed(2)} m</b>
             <span>GK reach</span><b>{psxg.reaction.toFixed(3)} + max({psxg.hTime.toFixed(3)}, {psxg.vTime.toFixed(3)}) = {psxg.diveTime.toFixed(3)} s</b>
-          </div>
-          <div className="calculation-card math-card psxg-calculation">
+          </div>}
+          {view === "calculations" && <div className="calculation-card math-card psxg-calculation">
             <div className="bk-title">PSxG calculation</div>
             <div className="equation">PSxG = clamp(f(GK reach - ball time), 0.01, 0.99)</div>
             <Row k="Ball time" v={`${fmt(distM(modelShot), 2)} / ${fmt(psxg.speedMs, 2)} = ${fmt(psxg.ballTime)} s`} />
             <Row k="Reach time" v={`${fmt(psxg.reaction)} + max(${fmt(psxg.hTime)}, ${fmt(psxg.vTime)}) = ${fmt(psxg.diveTime)} s`} />
             <Row k="Time margin" v={`${signed(psxg.margin)} s -> ${pct(psxg.psxg)}`} />
-          </div>
+          </div>}
         </section>
 
         <aside className="cards">
@@ -677,7 +678,6 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
         </aside>
       </main>
 
-      <footer className="foot">TactiSet · Next.js TypeScript build · models approximated natively in TypeScript.</footer>
     </>
   );
 }

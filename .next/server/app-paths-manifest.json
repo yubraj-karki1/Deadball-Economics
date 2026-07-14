@@ -4,6 +4,6 @@
   "/api/calculate_xg_grid/route": "app/api/calculate_xg_grid/route.js",
   "/api/health/route": "app/api/health/route.js",
   "/page": "app/page.js",
-  "/retrain/page": "app/retrain/page.js",
-  "/calculations/page": "app/calculations/page.js"
+  "/calculations/page": "app/calculations/page.js",
+  "/retrain/page": "app/retrain/page.js"
 }
