@@ -1208,7 +1208,7 @@ export default function DeadballLab() {
     <>
       <header className="topbar">
         <div>
-          <h1>Deadball Economics <span className="tag">Set-piece xG</span></h1>
+          <h1>TactiSet <span className="tag">Set-piece xG</span></h1>
           <p className="sub">A tactical set-piece lab rebuilt as a Next.js and React TypeScript app.</p>
         </div>
         <div className="top-actions">
@@ -1455,7 +1455,7 @@ export default function DeadballLab() {
         </aside>
       </main>
 
-      <footer className="foot">Deadball Economics · Next.js TypeScript build · models approximated natively in TypeScript.</footer>
+      <footer className="foot">TactiSet · Next.js TypeScript build · models approximated natively in TypeScript.</footer>
     </>
   );
 }

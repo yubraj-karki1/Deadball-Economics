@@ -1,4 +1,4 @@
-# Deadball Economics
+# TactiSet
 
 A Next.js, React, and TypeScript set-piece xG lab for exploring corners, free kicks, throw-ins, shot placement, keeper position, defensive walls, and direct free-kick craft.
 
