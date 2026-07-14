@@ -18,6 +18,7 @@ const GK_H = 4;
 const GK_V = 2.5;
 const SAVED_SCENARIOS_KEY = "deadball-economics-scenarios";
 const SAVED_TRAINED_MODELS_KEY = "deadball-economics-trained-models";
+const ACTIVE_TRAINED_MODEL_KEY = "deadball-economics-active-trained-model";
 
 type PresetKey = "nearPost" | "farPost" | "directFk" | "longThrow";
 type DragTarget = { kind: "shot" | "gk" | "start" | "def" | "atk"; index?: number } | null;
@@ -814,7 +815,7 @@ function directFreeKickVisual(start: Point, target: Point, curve: number, dip: n
   };
 }
 
-export default function DeadballLab() {
+export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain" }) {
   const [state, setState] = useState<LabState>(initialState);
   const [scenarioName, setScenarioName] = useState("Near-post corner");
   const [activePreset, setActivePreset] = useState<PresetKey | null>("nearPost");
@@ -867,8 +868,14 @@ export default function DeadballLab() {
 
   useEffect(() => {
     const models = readTrainedModels();
+    const activeModelId = window.localStorage.getItem(ACTIVE_TRAINED_MODEL_KEY) ?? "";
+    const activeModel = models.find((model) => model.id === activeModelId);
     setTrainedModels(models);
-    setSelectedModelId(models[0]?.id ?? "");
+    setSelectedModelId(activeModel?.id ?? models[0]?.id ?? "");
+    if (activeModel) {
+      setState((current) => ({ ...current, calibration: activeModel.calibration }));
+      setModelName(activeModel.name);
+    }
   }, []);
 
   useEffect(() => {
@@ -1015,9 +1022,13 @@ export default function DeadballLab() {
     update({ calibration: model.calibration });
     setSelectedModelId(model.id);
     setModelName(model.name);
+    window.localStorage.setItem(ACTIVE_TRAINED_MODEL_KEY, model.id);
   };
   const deleteTrainedModel = () => {
     const next = trainedModels.filter((item) => item.id !== selectedModelId);
+    if (window.localStorage.getItem(ACTIVE_TRAINED_MODEL_KEY) === selectedModelId) {
+      window.localStorage.removeItem(ACTIVE_TRAINED_MODEL_KEY);
+    }
     persistTrainedModels(next);
     setSelectedModelId(next[0]?.id ?? "");
   };
@@ -1102,6 +1113,7 @@ export default function DeadballLab() {
   const resetDefaultModel = () => {
     update({ calibration: DEFAULT_CALIBRATION });
     setSelectedModelId("");
+    window.localStorage.removeItem(ACTIVE_TRAINED_MODEL_KEY);
   };
   const updateSelectedModelNotes = (notes: string) => {
     if (!selectedModelId) return;
@@ -1209,21 +1221,25 @@ export default function DeadballLab() {
       <header className="topbar">
         <div>
           <h1>TactiSet <span className="tag">Set-piece xG</span></h1>
-          <p className="sub">A tactical set-piece lab rebuilt as a Next.js and React TypeScript app.</p>
+          <p className="sub">{view === "retrain" ? "Train, validate, compare, and manage custom set-piece models." : "A tactical set-piece lab rebuilt as a Next.js and React TypeScript app."}</p>
         </div>
         <div className="top-actions">
           <span className="model-pill">36,055 source shots</span>
+          {view === "retrain" && <a className="health" href="/">Back to lab</a>}
           <a className="health" href="/api/health" target="_blank">API health</a>
         </div>
       </header>
 
       <section className="scenario-strip">
-        {(Object.keys(PRESETS) as PresetKey[]).map((key) => (
+        {(Object.keys(PRESETS) as PresetKey[]).map((key) => view === "lab" ? (
           <button key={key} className={`preset ${activePreset === key ? "on" : ""}`} onClick={() => applyPreset(key)}>{PRESETS[key].name}</button>
+        ) : (
+          <a key={key} className="preset scenario-link" href="/">{PRESETS[key].name}</a>
         ))}
+        <a className={`preset scenario-link ${view === "retrain" ? "on" : ""}`} href="/retrain">Retrain model</a>
       </section>
 
-      <main className="grid">
+      <main className={`grid ${view === "retrain" ? "retrain-view" : ""}`}>
         <aside className="panel controls">
           <div className="panel-head"><span>Scenario</span><b>{scenarioName}</b></div>
           <div className="scenario-library">
@@ -1289,7 +1305,7 @@ export default function DeadballLab() {
             <button className={`btn toggle ${state.showHeat ? "on" : ""}`} onClick={() => update({ showHeat: !state.showHeat })}>xG heatmap</button>
             <button className={`btn toggle ${state.showVor ? "on" : ""}`} onClick={() => update({ showVor: !state.showVor })}>Voronoi</button>
           </div>
-          <div className="training-card open">
+          {view === "retrain" && <div className="training-card open">
             <div className="panel-row-title">
               <div className="fk-title">Retrain model</div>
             </div>
@@ -1357,7 +1373,7 @@ export default function DeadballLab() {
                 {trainingReport.warnings.length > 0 && <Row k="New warnings" v={trainingReport.warnings.join(", ")} />}
               </>}
             </div>
-          </div>
+          </div>}
           <div className="mini-card"><span>Pitch mode</span><b>105 x 68 m</b></div>
         </aside>
 

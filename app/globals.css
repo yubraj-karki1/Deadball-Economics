@@ -128,6 +128,13 @@ h1 {
   background: linear-gradient(180deg, rgba(27, 39, 31, 0.96), rgba(15, 24, 16, 0.96));
 }
 
+.scenario-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 .preset:hover,
 .preset.on,
 .btn.toggle.on {
@@ -142,6 +149,28 @@ h1 {
   gap: 12px;
   align-items: start;
   min-height: calc(100vh - 152px);
+}
+
+.grid.retrain-view {
+  display: block;
+  max-width: 900px;
+  min-height: calc(100vh - 152px);
+}
+
+.retrain-view > .panel:not(.controls),
+.retrain-view .controls > :not(.training-card) {
+  display: none;
+}
+
+.retrain-view .controls {
+  position: static;
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+}
+
+.retrain-view .training-card {
+  padding: 18px;
 }
 
 .panel,

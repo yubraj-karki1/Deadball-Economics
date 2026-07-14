@@ -56,6 +56,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../app/retrain/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/retrain">> = Specific
+  const handler = {} as typeof import("../../app/retrain/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../app/api/calculate_xg/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/calculate_xg">> = Specific
