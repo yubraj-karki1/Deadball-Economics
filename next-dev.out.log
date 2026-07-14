@@ -1,0 +1,31 @@
+
+> deadball-economics-next@1.0.0 dev
+> next dev
+
+   ▲ Next.js 15.5.20
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.198.1:3000
+
+ ✓ Starting...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you.
+   The following suggested values were added to your tsconfig.json. These values can be changed to fit your project's needs:
+
+   	- include was updated to add '.next-dev/types/**/*.ts'
+
+ ✓ Ready in 1987ms
+ ○ Compiling / ...
+ ✓ Compiled / in 3.2s (547 modules)
+ GET / 200 in 3586ms
+ ✓ Compiled /retrain in 480ms (535 modules)
+ GET /retrain 200 in 753ms
+ GET / 200 in 84ms
+ GET /retrain 200 in 116ms
+ ✓ Compiled in 183ms (535 modules)
+ GET / 200 in 116ms
+ GET /retrain 200 in 67ms
+ GET / 200 in 62ms
+ GET /retrain 200 in 60ms
+ GET / 200 in 67ms
+ ✓ Compiled /api/calculate_xg in 285ms (554 modules)
+ POST /api/calculate_xg 200 in 405ms

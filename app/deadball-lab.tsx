@@ -717,7 +717,7 @@ function xgMath(result: XgResponse | null, state: LabState, modelShot: Point, is
   if (kind === "freekick" && isDirect) {
     const distanceTerm = clamp((29 - distance) / 9.5, -1.25, 1.15) * calibration.distanceWeight;
     const centerTerm = -centrality * 0.018 * calibration.angleWeight;
-    const wallTerm = -Number(derived.wall_size ?? state.wallSize) * 0.09 * calibration.wallPenalty;
+    const wallTerm = -Number(derived.wall_obstruction ?? derived.wall_size ?? state.wallSize) * 0.085 * calibration.wallPenalty;
     const craftTerm = Number(derived.direct_craft_logit ?? 0) * calibration.craftBonus;
     base = -2.9;
     terms.push(["distance", distanceTerm], ["angle", centerTerm], ["wall", wallTerm], ["craft", craftTerm]);
@@ -839,6 +839,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
   const modelShot = isDirect ? state.start : state.shot;
   const directFoot = isDirect && state.body === "Left Foot" ? "Left Foot" : "Right Foot";
   const effectiveCurve = footAdjustedCurve(state.curve, directFoot);
+  const directTargetSbY = +((GY - GOAL_W / 2 + state.ball[0]) * 80 / P_W).toFixed(2);
   const craftBonus = isDirect ? Math.min(0.18, Math.abs(state.curve) / 100 * 0.055 + state.dip / 100 * 0.08 + state.knuckle / 100 * 0.07) : 0;
   const psxg = useMemo(() => calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus, state.calibration), [state.ball, state.calibration, state.gkf, state.shotSpeed, modelShot, craftBonus]);
   const combined = result ? result.xg * psxg.psxg : null;
@@ -899,6 +900,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
           shot_curve: isDirect ? effectiveCurve : undefined,
           shot_dip: isDirect ? state.dip : undefined,
           shot_knuckle: isDirect ? state.knuckle : undefined,
+          shot_target_y: isDirect ? directTargetSbY : undefined,
           calibration: state.calibration,
         };
         const res = await fetch("/api/calculate_xg", {
@@ -917,7 +919,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
       window.clearTimeout(timer);
       controller.abort(new DOMException("Deadball xG request superseded", "AbortError"));
     };
-  }, [effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.calibration, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
+  }, [directTargetSbY, effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.calibration, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
     if (!state.showHeat) {
@@ -945,6 +947,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
             shot_curve: isDirect ? effectiveCurve : undefined,
             shot_dip: isDirect ? state.dip : undefined,
             shot_knuckle: isDirect ? state.knuckle : undefined,
+            shot_target_y: isDirect ? directTargetSbY : undefined,
             calibration: state.calibration,
           }),
           signal: controller.signal,
@@ -960,7 +963,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
       window.clearTimeout(timer);
       controller.abort(new DOMException("Deadball xG grid request superseded", "AbortError"));
     };
-  }, [effectiveCurve, isDirect, state.attackers, state.body, state.calibration, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.showHeat, state.spType, state.swing, wallPlayers]);
+  }, [directTargetSbY, effectiveCurve, isDirect, state.attackers, state.body, state.calibration, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.showHeat, state.spType, state.swing, wallPlayers]);
 
   useEffect(() => {
     const up = () => {
@@ -1184,9 +1187,10 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
       shot_curve: isDirect ? effectiveCurve : undefined,
       shot_dip: isDirect ? state.dip : undefined,
       shot_knuckle: isDirect ? state.knuckle : undefined,
+      shot_target_y: isDirect ? directTargetSbY : undefined,
       calibration: DEFAULT_CALIBRATION,
     });
-  }, [directFoot, effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
+  }, [directFoot, directTargetSbY, effectiveCurve, isDirect, modelShot, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
   const selectedModelResult = useMemo(() => {
     if (!selectedTrainedModel) return null;
     const [shot_x, shot_y] = toSB(modelShot);
@@ -1206,9 +1210,10 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
       shot_curve: isDirect ? effectiveCurve : undefined,
       shot_dip: isDirect ? state.dip : undefined,
       shot_knuckle: isDirect ? state.knuckle : undefined,
+      shot_target_y: isDirect ? directTargetSbY : undefined,
       calibration: selectedTrainedModel.calibration,
     });
-  }, [directFoot, effectiveCurve, isDirect, modelShot, selectedTrainedModel, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
+  }, [directFoot, directTargetSbY, effectiveCurve, isDirect, modelShot, selectedTrainedModel, state.attackers, state.body, state.defenders, state.dip, state.gk, state.height, state.knuckle, state.shotSpeed, state.spType, state.swing, wallPlayers]);
   const selectedModelPsxg = selectedTrainedModel ? calcPhysics(state.ball, state.gkf, state.shotSpeed, distM(modelShot), craftBonus, selectedTrainedModel.calibration) : null;
   const selectedCombined = selectedModelResult && selectedModelPsxg ? selectedModelResult.xg * selectedModelPsxg.psxg : null;
   const selectedXgDelta = selectedModelResult ? selectedModelResult.xg - defaultModelResult.xg : null;
@@ -1463,6 +1468,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
             <Row k="Marking" v={result?.marking_label || "-"} />
             <Row k="In box - def / atk" v={`${result?.derived.defenders_in_box ?? "-"} / ${result?.derived.attackers_in_box ?? "-"}`} />
             {isFreeKick && <Row k="Wall" v={`${result?.derived.wall_size ?? state.wallSize} players`} />}
+            {isDirect && <Row k="Wall coverage" v={`${(Number(result?.derived.wall_obstruction ?? 0) * 100 / 3.25).toFixed(0)}%`} />}
             {isDirect && <Row k="Craft" v={`${Number(result?.derived.direct_craft_logit ?? 0).toFixed(3)} logit`} />}
             {isDirect && <Row k="Dip effect" v={`${Number(result?.derived.direct_dip_logit ?? 0).toFixed(3)} logit`} />}
             {isDirect && <Row k="Knuckle effect" v={`${Number(result?.derived.direct_knuckle_logit ?? 0).toFixed(3)} logit`} />}

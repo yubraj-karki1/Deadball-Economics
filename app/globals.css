@@ -152,8 +152,10 @@ h1 {
 }
 
 .grid.retrain-view {
-  display: block;
-  max-width: 900px;
+  display: grid;
+  grid-template-columns: minmax(560px, 1fr) minmax(300px, 360px);
+  gap: 14px;
+  max-width: 1280px;
   min-height: calc(100vh - 152px);
 }
 
@@ -171,6 +173,14 @@ h1 {
 
 .retrain-view .training-card {
   padding: 18px;
+}
+
+.retrain-view > .cards {
+  display: grid;
+  grid-column: 2;
+  align-self: start;
+  position: sticky;
+  top: 18px;
 }
 
 .panel,
@@ -572,4 +582,31 @@ a:focus-visible {
   .metrics { grid-template-columns: repeat(2, 1fr); }
   .pitch-math-grid { grid-template-columns: 1fr; }
   .formula-live { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 980px) {
+  .grid.retrain-view {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .retrain-view > .cards {
+    position: static;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .retrain-view > .cards .insight {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .retrain-view > .cards {
+    grid-template-columns: 1fr;
+  }
+
+  .retrain-view > .cards .insight {
+    grid-column: auto;
+  }
 }

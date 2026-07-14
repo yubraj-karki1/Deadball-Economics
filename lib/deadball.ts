@@ -27,6 +27,7 @@ export type XgRequest = {
   shot_curve?: number;
   shot_dip?: number;
   shot_knuckle?: number;
+  shot_target_y?: number;
   calibration?: ModelCalibration;
   minute?: number;
 };
@@ -171,22 +172,30 @@ function marking(defenders: Point[] = [], attackers: Point[] = []) {
   };
 }
 
-function wallSize(shot: Point, defenders: Point[] = []) {
+function wallProfile(shot: Point, defenders: Point[] = [], targetY = 40) {
   const [bx, by] = shot;
   const vx = 120 - bx;
-  const vy = 40 - by;
+  const vy = targetY - by;
   const length = Math.hypot(vx, vy) || 1;
   const ux = vx / length;
   const uy = vy / length;
-  let n = 0;
+  let size = 0;
+  let obstruction = 0;
 
   for (const [px, py] of defenders) {
     const t = (px - bx) * ux + (py - by) * uy;
-    if (t <= 0 || t > length) continue;
-    if (Math.abs((px - bx) * -uy + (py - by) * ux) <= 1.5) n += 1;
+    // A regulation wall sits roughly 9.15 m from the ball. Restricting the
+    // candidates prevents defenders near the goal from being counted as wall.
+    if (t < 4 || t > Math.min(16, length - 0.5)) continue;
+    const lateral = Math.abs((px - bx) * -uy + (py - by) * ux);
+    if (lateral > 6) continue;
+    size += 1;
+    // Smooth coverage avoids abrupt xG drops when a player crosses a hard line.
+    // Central blockers contribute most; players shifted away taper to zero.
+    obstruction += clamp(1 - lateral / 2.4, 0, 1);
   }
 
-  return n;
+  return { size, obstruction: Math.min(obstruction, 3.25) };
 }
 
 function directCraft(req: Partial<XgRequest>) {
@@ -213,7 +222,7 @@ function directCraft(req: Partial<XgRequest>) {
   };
 }
 
-function heuristicXg(kind: keyof typeof P_SHOT, req: XgRequest, derived: ReturnType<typeof freeze>, mark: ReturnType<typeof marking>, wall: number) {
+function heuristicXg(kind: keyof typeof P_SHOT, req: XgRequest, derived: ReturnType<typeof freeze>, mark: ReturnType<typeof marking>, wall: { size: number; obstruction: number }) {
   const x = Number(req.shot_x);
   const y = Number(req.shot_y);
   const distance = dist(x, y, 120, 40);
@@ -255,7 +264,7 @@ function heuristicXg(kind: keyof typeof P_SHOT, req: XgRequest, derived: ReturnT
       logit = -2.9
         + clamp((29 - distance) / 9.5, -1.25, 1.15) * distanceWeight
         - centrality * 0.018 * angleWeight
-        - wall * 0.09 * wallPenalty
+        - wall.obstruction * 0.085 * wallPenalty
         + directCraft(req).direct_craft_logit * craftBonus;
     } else {
       logit -= 0.16;
@@ -279,7 +288,7 @@ export function predict(req: XgRequest): XgResponse {
   const derived = freeze(shot, req.gk, defenders, attackers);
   const mark = marking(defenders, attackers);
   const direct = isDirectFreekick(req, base);
-  const wall = direct ? wallSize(shot, defenders) : 0;
+  const wall = direct ? wallProfile(shot, defenders, Number(req.shot_target_y ?? 40)) : { size: 0, obstruction: 0 };
   const craft = direct ? directCraft(req) : null;
   const xg = heuristicXg(kind, req, derived, mark, wall);
   const pShot = direct ? 1 : P_SHOT[kind];
@@ -297,7 +306,8 @@ export function predict(req: XgRequest): XgResponse {
     derived: {
       ...derived,
       man_ratio: mark.man_ratio,
-      wall_size: wall,
+      wall_size: wall.size,
+      wall_obstruction: round4(wall.obstruction),
       calibration_distance_weight: round2(scale(req.calibration?.distanceWeight)),
       calibration_angle_weight: round2(scale(req.calibration?.angleWeight)),
       calibration_wall_penalty: round2(scale(req.calibration?.wallPenalty)),
