@@ -1,14 +1,16 @@
 :root {
-  --bg: #0c0f0d;
-  --ink: #f6f5ec;
-  --muted: #a9b8aa;
-  --panel: #17211c;
-  --panel-2: #111812;
-  --border: #34463a;
-  --deep: #d7f25c;
-  --teal: #2dd4bf;
-  --amber: #f6b73c;
-  --shadow: 0 22px 70px rgba(0, 0, 0, 0.38);
+  --bg: #0a1410;
+  --ink: #f3f6f1;
+  --muted: #9db4a4;
+  --panel: #10241a;
+  --panel-2: #0d1c14;
+  --border: #1f3d2c;
+  --deep: #e0b84a;
+  --teal: #4fd0a5;
+  --amber: #e08a3c;
+  --danger: #ef5b5b;
+  --cream: #f7ecd0;
+  --shadow: 0 22px 70px rgba(0, 0, 0, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -22,9 +24,9 @@ body {
   font-size: 14px;
   color: var(--ink);
   background:
-    linear-gradient(180deg, rgba(12, 15, 13, 0.92), rgba(7, 9, 8, 0.98)),
-    radial-gradient(circle at 14% 0%, rgba(215, 242, 92, 0.12), transparent 34%),
-    #070908;
+    linear-gradient(180deg, rgba(10, 20, 16, 0.92), rgba(5, 9, 7, 0.98)),
+    radial-gradient(circle at 14% 0%, rgba(224, 184, 74, 0.1), transparent 34%),
+    #050907;
   padding: 16px;
 }
 
@@ -46,9 +48,9 @@ button, select, input { font: inherit; }
   gap: 16px;
   margin-bottom: 10px;
   padding: 12px 16px;
-  border: 1px solid rgba(215, 242, 92, 0.2);
+  border: 1px solid rgba(224, 184, 74, 0.2);
   border-radius: 8px;
-  background: rgba(19, 28, 23, 0.94);
+  background: rgba(15, 28, 21, 0.94);
   box-shadow: 0 14px 44px rgba(0, 0, 0, 0.32);
 }
 
@@ -65,7 +67,7 @@ h1 {
   padding: 4px 8px;
   border-radius: 7px;
   background: var(--deep);
-  color: #15200c;
+  color: #241706;
   font-size: 12px;
   font-weight: 800;
   vertical-align: middle;
@@ -140,7 +142,7 @@ h1 {
 .btn.toggle.on {
   background: var(--deep);
   border-color: var(--deep);
-  color: #15200c;
+  color: #241706;
 }
 
 .grid {
@@ -218,9 +220,9 @@ h1 {
   display: grid;
   gap: 5px;
   padding: 18px;
-  border: 1px solid rgba(215, 242, 92, 0.18);
+  border: 1px solid rgba(224, 184, 74, 0.18);
   border-radius: 8px;
-  background: linear-gradient(135deg, rgba(215, 242, 92, 0.1), rgba(45, 212, 191, 0.04));
+  background: linear-gradient(135deg, rgba(224, 184, 74, 0.1), rgba(79, 208, 165, 0.04));
 }
 
 .calculation-hero span,
@@ -237,13 +239,13 @@ h1 {
 }
 
 .psxg-hero {
-  background: linear-gradient(135deg, rgba(45, 212, 191, 0.1), rgba(215, 242, 92, 0.04));
+  background: linear-gradient(135deg, rgba(79, 208, 165, 0.1), rgba(224, 184, 74, 0.04));
 }
 
 .panel,
 .card {
   background: linear-gradient(180deg, rgba(24, 35, 29, 0.98), rgba(10, 15, 12, 0.98));
-  border: 1px solid rgba(215, 242, 92, 0.16);
+  border: 1px solid rgba(224, 184, 74, 0.16);
   border-radius: 8px;
   box-shadow: var(--shadow);
 }
@@ -264,7 +266,7 @@ h1 {
 }
 
 .panel-head b {
-  color: #fff9d6;
+  color: #f7ecd0;
   font-size: 13px;
   text-transform: none;
 }
@@ -373,13 +375,13 @@ a:focus-visible {
 }
 
 .btn.danger {
-  border-color: rgba(255, 90, 95, 0.42);
+  border-color: rgba(239, 91, 91, 0.42);
 }
 
 .btn.danger:hover:not(:disabled) {
-  background: #ff5a5f;
-  border-color: #ff5a5f;
-  color: #200607;
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #2a0d0d;
 }
 
 .mini-card,
@@ -391,7 +393,7 @@ a:focus-visible {
 .formula-live {
   padding: 11px;
   border-radius: 8px;
-  border: 1px solid rgba(215, 242, 92, 0.13);
+  border: 1px solid rgba(224, 184, 74, 0.13);
   background: rgba(10, 18, 13, 0.76);
 }
 
@@ -419,10 +421,10 @@ a:focus-visible {
 .mini-btn {
   min-height: 26px;
   padding: 0 8px;
-  border: 1px solid rgba(215, 242, 92, 0.2);
+  border: 1px solid rgba(224, 184, 74, 0.2);
   border-radius: 7px;
-  background: rgba(215, 242, 92, 0.08);
-  color: #fff9d6;
+  background: rgba(224, 184, 74, 0.08);
+  color: #f7ecd0;
   font-size: 11px;
   font-weight: 900;
   cursor: pointer;
@@ -430,7 +432,7 @@ a:focus-visible {
 
 .mini-btn:hover {
   background: var(--deep);
-  color: #15200c;
+  color: #241706;
 }
 
 .mini-btn:disabled {
@@ -441,7 +443,7 @@ a:focus-visible {
 .fk-title,
 .bk-title {
   margin-bottom: 8px;
-  color: #fff9d6;
+  color: #f7ecd0;
   font-size: 13px;
   font-weight: 900;
 }
@@ -492,7 +494,7 @@ a:focus-visible {
   min-width: 0;
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid rgba(215, 242, 92, 0.13);
+  border: 1px solid rgba(224, 184, 74, 0.13);
   background: rgba(10, 18, 13, 0.78);
 }
 
@@ -527,7 +529,7 @@ a:focus-visible {
   padding: 9px;
   border-radius: 8px;
   background: rgba(10, 18, 13, 0.76);
-  border: 1px solid rgba(215, 242, 92, 0.11);
+  border: 1px solid rgba(224, 184, 74, 0.11);
 }
 
 .m {
@@ -589,8 +591,8 @@ a:focus-visible {
 .equation {
   padding: 9px;
   border-radius: 8px;
-  background: rgba(215, 242, 92, 0.08);
-  color: #fff9d6;
+  background: rgba(224, 184, 74, 0.08);
+  color: #f7ecd0;
   font-size: 12px;
   font-weight: 850;
   line-height: 1.35;

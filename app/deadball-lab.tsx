@@ -588,20 +588,20 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
             <PitchMarks />
             {state.showVor && <Voronoi defenders={[...state.defenders, ...wallPlayers]} attackers={state.attackers} gk={state.gk} />}
             {heat.map((c, i) => <rect key={i} x={c.x - 1.1} y={c.y - 1.3} width="2.2" height="2.6" fill={heatColor(c.xg)} opacity="0.5" />)}
-            {directVisual && state.dip > 0 && <path d={directVisual.dipPath} fill="none" stroke="#fff9d6" strokeWidth={0.16 + state.dip / 230} strokeDasharray="0.8 1" opacity={0.15 + state.dip / 170} />}
-            <path d={shotPath} fill="none" stroke="#d7f25c" strokeWidth="0.48" strokeDasharray="1.2 0.8" />
-            {directVisual && state.dip > 0 && directVisual.heightMarks.map((mark, i) => <circle key={`dip${i}`} cx={mark.x} cy={mark.y} r={mark.radius} fill="#fff9d6" opacity={mark.opacity} />)}
-            {state.attackers.map((a, i) => <Player key={`a${i}`} p={a} color="#2dd4bf" onPointerDown={() => setDrag({ kind: "atk", index: i })} />)}
-            {state.defenders.map((d, i) => <Player key={`d${i}`} p={d} color="#ff5a5f" onPointerDown={() => setDrag({ kind: "def", index: i })} />)}
-            {wallPlayers.map((d, i) => <g key={`w${i}`}><Player p={d} color="#f6b73c" /><text x={d[0]} y={d[1] + 0.34} textAnchor="middle" fontSize="0.82" fill="#241706" fontWeight="bold">W</text></g>)}
-            <Player p={state.gk} color="#d7f25c" label="GK" onPointerDown={() => setDrag({ kind: "gk" })} />
-            <Player p={state.start} color="#d7f25c" radius={0.8} onPointerDown={() => setDrag({ kind: "start" })} />
+            {directVisual && state.dip > 0 && <path d={directVisual.dipPath} fill="none" stroke="#f7ecd0" strokeWidth={0.16 + state.dip / 230} strokeDasharray="0.8 1" opacity={0.15 + state.dip / 170} />}
+            <path d={shotPath} fill="none" stroke="#e0b84a" strokeWidth="0.48" strokeDasharray="1.2 0.8" />
+            {directVisual && state.dip > 0 && directVisual.heightMarks.map((mark, i) => <circle key={`dip${i}`} cx={mark.x} cy={mark.y} r={mark.radius} fill="#f7ecd0" opacity={mark.opacity} />)}
+            {state.attackers.map((a, i) => <Player key={`a${i}`} p={a} color="#4fd0a5" onPointerDown={() => setDrag({ kind: "atk", index: i })} />)}
+            {state.defenders.map((d, i) => <Player key={`d${i}`} p={d} color="#ef5b5b" onPointerDown={() => setDrag({ kind: "def", index: i })} />)}
+            {wallPlayers.map((d, i) => <g key={`w${i}`}><Player p={d} color="#e08a3c" /><text x={d[0]} y={d[1] + 0.34} textAnchor="middle" fontSize="0.82" fill="#241706" fontWeight="bold">W</text></g>)}
+            <Player p={state.gk} color="#e0b84a" label="GK" onPointerDown={() => setDrag({ kind: "gk" })} />
+            <Player p={state.start} color="#e0b84a" radius={0.8} onPointerDown={() => setDrag({ kind: "start" })} />
             {!isDirect ? <>
               <line x1={state.shot[0]} y1={state.shot[1]} x2={GX} y2={GY} stroke="#ffffffaa" strokeWidth="0.25" strokeDasharray="1.2 0.8" />
               <Player p={state.shot} color="#fff" radius={1.12} onPointerDown={() => setDrag({ kind: "shot" })} />
             </> : <circle cx={directTarget[0]} cy={directTarget[1]} r="0.45" fill="#fff" stroke="#111" strokeWidth="0.2" />}
           </svg>
-          <div className="legend"><Legend color="#fff9d6" text="Shot" /><Legend color="#d7f25c" text="Delivery / GK" /><Legend color="#ff5a5f" text="Defenders" /><Legend color="#2dd4bf" text="Attackers" /><Legend color="#f6b73c" text="Wall" /></div>
+          <div className="legend"><Legend color="#f7ecd0" text="Shot" /><Legend color="#e0b84a" text="Delivery / GK" /><Legend color="#ef5b5b" text="Defenders" /><Legend color="#4fd0a5" text="Attackers" /><Legend color="#e08a3c" text="Wall" /></div>
           {view === "calculations" && <div className="pitch-math-grid">
             {xgSolution && <div className="calculation-card math-card">
               <div className="bk-title">xG calculation</div>
@@ -631,7 +631,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               const v = calcPhysics([x, y], state.gkf, state.shotSpeed, distM(modelShot), craftBonus, state.calibration).psxg;
               return <g key={`${c}-${r}`}><rect x={16 + c * 183} y={16 + r * 81.33} width="183" height="81.33" fill={zoneFill(v)} stroke="rgba(255,255,255,.25)" /><text x={16 + c * 183 + 91.5} y={16 + r * 81.33 + 44} textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{v.toFixed(2)}</text></g>;
             }))}
-            <ellipse cx={gkSvgX} cy={gkSvgY} rx={Math.max(44, (psxg.ballTime - 0.15) * GK_H * 85)} ry={Math.max(44, (psxg.ballTime - 0.15) * GK_V * 85)} fill="rgba(45,212,191,.16)" stroke="rgba(45,212,191,.9)" strokeDasharray="6 4" />
+            <ellipse cx={gkSvgX} cy={gkSvgY} rx={Math.max(44, (psxg.ballTime - 0.15) * GK_H * 85)} ry={Math.max(44, (psxg.ballTime - 0.15) * GK_V * 85)} fill="rgba(79,208,165,.16)" stroke="rgba(79,208,165,.9)" strokeDasharray="6 4" />
             <GoalkeeperFigure x={gkSvgX} y={gkSvgY} targetX={ballSvgX} targetY={ballSvgY} onPointerDown={() => setGoalDrag("gk")} />
             <g onPointerDown={() => setGoalDrag("ball")} className="grab"><circle cx={ballSvgX} cy={ballSvgY} r="16" fill="#fff" stroke="#333" strokeWidth="2" /><text x={ballSvgX} y={ballSvgY + 29} textAnchor="middle" fill="#fff" fontSize="12" fontWeight="bold">BALL</text></g>
           </svg>
