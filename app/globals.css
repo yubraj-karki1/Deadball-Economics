@@ -530,6 +530,10 @@ a:focus-visible {
 
 .grab { cursor: grab; }
 
+.flight-controls {
+  margin-top: 10px;
+}
+
 
 .legend {
   padding: 10px 2px 0;

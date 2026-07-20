@@ -14,6 +14,14 @@ import { scoreShotsCsv, type BatchScoreResult } from "../features/lab/batch-scor
 import type { DragTarget, GoalDrag, LabState, PresetKey, SavedScenario, TrainedModel, TrainingReport } from "../features/lab/types";
 import { clamp, distM, heatColor, isAbortError, pct, toSB } from "../features/lab/utils";
 
+function pointOnPath(pathEl: SVGPathElement | null, t: number) {
+  if (!pathEl) return null;
+  const length = pathEl.getTotalLength();
+  if (!Number.isFinite(length) || length <= 0) return null;
+  const point = pathEl.getPointAtLength(clamp(t, 0, 1) * length);
+  return { x: point.x, y: point.y };
+}
+
 export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain" | "calculations" }) {
   const [state, setState] = useState<LabState>(initialState);
   const [scenarioName, setScenarioName] = useState("Near-post corner");
@@ -31,8 +39,11 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
   const [goalDrag, setGoalDrag] = useState<GoalDrag>(null);
   const [showCoords, setShowCoords] = useState(false);
   const [batchReport, setBatchReport] = useState<BatchScoreResult | null>(null);
+  const [flightProgress, setFlightProgress] = useState<number | null>(null);
   const pitchRef = useRef<SVGSVGElement | null>(null);
   const goalRef = useRef<SVGSVGElement | null>(null);
+  const flightPathRef = useRef<SVGPathElement | null>(null);
+  const flightRafRef = useRef<number | null>(null);
 
   const isDirect = state.spType === "freekick-direct";
   const isFreeKick = state.spType.startsWith("freekick");
@@ -398,6 +409,47 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
   const directTarget: Point = [GX, clamp(GY - GOAL_W / 2 + state.ball[0], GY - GOAL_W / 2, GY + GOAL_W / 2)];
   const directVisual = isDirect ? directFreeKickVisual(state.start, directTarget, effectiveCurve, state.dip, state.knuckle) : null;
   const shotPath = directVisual?.path ?? swingPath(state.start, state.shot, state.swing);
+  const animPathD = directVisual && state.dip > 0 ? directVisual.dipPath : shotPath;
+
+  useEffect(() => {
+    if (flightRafRef.current != null) {
+      cancelAnimationFrame(flightRafRef.current);
+      flightRafRef.current = null;
+    }
+    setFlightProgress(null);
+  }, [animPathD]);
+
+  useEffect(() => () => {
+    if (flightRafRef.current != null) cancelAnimationFrame(flightRafRef.current);
+  }, []);
+
+  const flightPoint = flightProgress != null ? pointOnPath(flightPathRef.current, flightProgress) : null;
+
+  const playDelivery = () => {
+    const pathEl = flightPathRef.current;
+    if (!pathEl) return;
+    if (flightRafRef.current != null) {
+      cancelAnimationFrame(flightRafRef.current);
+      flightRafRef.current = null;
+    }
+    const length = pathEl.getTotalLength();
+    if (!Number.isFinite(length) || length <= 0) return;
+    const durationMs = clamp(length * (2800 / Math.max(30, state.shotSpeed)), 450, 1800);
+    const startTime = performance.now();
+
+    const step = (now: number) => {
+      const t = clamp((now - startTime) / durationMs, 0, 1);
+      setFlightProgress(t);
+      if (t < 1) {
+        flightRafRef.current = requestAnimationFrame(step);
+      } else {
+        flightRafRef.current = null;
+        window.setTimeout(() => setFlightProgress(null), 200);
+      }
+    };
+    flightRafRef.current = requestAnimationFrame(step);
+  };
+
   const [ballSvgX, ballSvgY] = goalPointToSvg(state.ball);
   const [gkSvgX, gkSvgY] = goalPointToSvg(state.gkf);
   const xgSolution = xgMath(result, state, modelShot, isDirect, state.calibration);
@@ -655,6 +707,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
           {view === "calculations" && <div className="calculation-hero"><span>Current shot xG</span><b>{pct(result?.xg)}</b><small>{result?.zone ?? "Calculating"} · {fmt(result?.distance_to_goal ?? distM(modelShot), 1)} m</small></div>}
           <svg ref={pitchRef} viewBox="55 0 50 68" preserveAspectRatio="xMidYMid meet" className="pitch" onPointerMove={onPitchMove}>
             <PitchMarks />
+            <path ref={flightPathRef} d={animPathD} fill="none" stroke="none" />
             {state.showVor && <Voronoi defenders={[...state.defenders, ...wallPlayers]} attackers={state.attackers} gk={state.gk} />}
             {heat.map((c, i) => <rect key={i} x={c.x - 1.1} y={c.y - 1.3} width="2.2" height="2.6" fill={heatColor(c.xg)} opacity="0.5" />)}
             {directVisual && state.dip > 0 && <path d={directVisual.dipPath} fill="none" stroke="#f7ecd0" strokeWidth={0.16 + state.dip / 230} strokeDasharray="0.8 1" opacity={0.15 + state.dip / 170} />}
@@ -669,7 +722,11 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               <line x1={state.shot[0]} y1={state.shot[1]} x2={GX} y2={GY} stroke="#ffffffaa" strokeWidth="0.25" strokeDasharray="1.2 0.8" />
               <Player p={state.shot} color="#fff" radius={1.12} onPointerDown={() => setDrag({ kind: "shot" })} />
             </> : <circle cx={directTarget[0]} cy={directTarget[1]} r="0.45" fill="#fff" stroke="#111" strokeWidth="0.2" />}
+            {flightPoint && <circle cx={flightPoint.x} cy={flightPoint.y} r="0.55" fill="#f7ecd0" stroke="#241706" strokeWidth="0.18" />}
           </svg>
+          {view !== "calculations" && <div className="tool-row flight-controls">
+            <button className="btn" style={{ gridColumn: "1 / -1" }} onClick={playDelivery} disabled={flightProgress !== null}>{flightProgress !== null ? "Playing delivery…" : "▶ Play delivery"}</button>
+          </div>}
           <div className="legend"><Legend color="#f7ecd0" text="Shot" /><Legend color="#e0b84a" text="Delivery / GK" /><Legend color="#ef5b5b" text="Defenders" /><Legend color="#4fd0a5" text="Attackers" /><Legend color="#e08a3c" text="Wall" /></div>
           {view === "calculations" && <div className="pitch-math-grid">
             {xgSolution && <div className="calculation-card math-card">
