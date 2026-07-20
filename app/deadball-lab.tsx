@@ -6,10 +6,11 @@ import { directFreeKickVisual, fmt, signed, xgMath } from "../features/lab/calcu
 import { GoalkeeperFigure, PitchMarks, Player, Voronoi, zoneFill } from "../features/lab/pitch-components";
 import { recommendationFor } from "../features/lab/recommendations";
 import { ReliabilityChart } from "../features/lab/reliability-chart";
-import { Card, Legend, Metric, Row, Slider } from "../features/lab/ui-components";
+import { Card, Legend, Metric, PointInput, Row, Slider } from "../features/lab/ui-components";
 import { calcPhysics, footAdjustedCurve, goalPointToSvg, swingPath } from "../features/lab/physics";
 import { calibrationOr, makeScenarioId, numberOr, readSavedScenarios, readTrainedModels, writeSavedScenarios, writeTrainedModels } from "../features/lab/storage";
 import { modelConfidence, trainCalibrationFromCsv } from "../features/lab/training";
+import { scoreShotsCsv, type BatchScoreResult } from "../features/lab/batch-scoring";
 import type { DragTarget, GoalDrag, LabState, PresetKey, SavedScenario, TrainedModel, TrainingReport } from "../features/lab/types";
 import { clamp, distM, heatColor, isAbortError, pct, toSB } from "../features/lab/utils";
 
@@ -28,6 +29,8 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
   const [heat, setHeat] = useState<GridResponse["grid"]>([]);
   const [drag, setDrag] = useState<DragTarget>(null);
   const [goalDrag, setGoalDrag] = useState<GoalDrag>(null);
+  const [showCoords, setShowCoords] = useState(false);
+  const [batchReport, setBatchReport] = useState<BatchScoreResult | null>(null);
   const pitchRef = useRef<SVGSVGElement | null>(null);
   const goalRef = useRef<SVGSVGElement | null>(null);
 
@@ -298,6 +301,37 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
     setSelectedModelId(report.model.id);
     setModelName(report.model.name);
   };
+  const scoreCsvFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const result = scoreShotsCsv(await file.text(), state.calibration);
+    setBatchReport(result);
+    if ("error" in result) return;
+
+    const blob = new Blob([result.csv], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${file.name.replace(/\.csv$/i, "") || "shots"}-scored.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+  const downloadBatchTemplate = () => {
+    const template = [
+      "shot_x,shot_y,setpiece_type,gk_x,gk_y,body_part,delivery_technique,delivery_height,defenders,attackers",
+      '101.5,31.5,corner-right,104,34,Head,Inswinging,High Pass,"[[101,32],[102.2,34]]","[[101.5,31.5]]"',
+      '84,32,freekick-direct,104,34,Right Foot,,,"[[100,38]]","[[87,31]]"',
+    ].join("\n");
+    const blob = new Blob([template], { type: "text/csv" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "deadball-batch-scoring-template.csv";
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
   const downloadCsvTemplate = () => {
     const template = [
       "goal,shot_x,shot_y,wall_size,shot_curve,shot_dip,shot_knuckle,shot_speed,ball_x,ball_y,gk_x,gk_y",
@@ -510,6 +544,23 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
             <button className={`btn toggle ${state.showHeat ? "on" : ""}`} onClick={() => update({ showHeat: !state.showHeat })}>xG heatmap</button>
             <button className={`btn toggle ${state.showVor ? "on" : ""}`} onClick={() => update({ showVor: !state.showVor })}>Voronoi</button>
           </div>
+          <div className="tool-row">
+            <button className={`btn toggle ${showCoords ? "on" : ""}`} style={{ gridColumn: "1 / -1" }} onClick={() => setShowCoords((v) => !v)}>Coordinates {showCoords ? "▲" : "▼"}</button>
+          </div>
+          {showCoords && <div className="coords-card">
+            <div className="fk-title">Precise coordinates (pitch: {X0}-{X1}m x, 0-68m y)</div>
+            {!isDirect && <PointInput label="Shot" value={state.shot} xMin={X0} xMax={X1} yMin={0} yMax={68} onChange={(shot) => { setScenarioName("Custom setup"); update({ shot }); }} />}
+            {!isCorner && <PointInput label={isDirect ? "Kick spot" : "Delivery start"} value={state.start} xMin={X0} xMax={X1} yMin={0} yMax={68} onChange={(start) => { setScenarioName("Custom setup"); update({ start }); }} />}
+            <PointInput label="Goalkeeper (pitch)" value={state.gk} xMin={X0} xMax={X1} yMin={0} yMax={68} onChange={(gk) => { setScenarioName("Custom setup"); update({ gk }); }} />
+            {state.defenders.map((d, i) => (
+              <PointInput key={`def-${i}`} label={`Defender ${i + 1}`} value={d} xMin={X0} xMax={X1} yMin={0} yMax={68} onChange={(p) => { setScenarioName("Custom setup"); update({ defenders: state.defenders.map((x, j) => (j === i ? p : x)) }); }} />
+            ))}
+            {state.attackers.map((a, i) => (
+              <PointInput key={`atk-${i}`} label={`Attacker ${i + 1}`} value={a} xMin={X0} xMax={X1} yMin={0} yMax={68} onChange={(p) => { setScenarioName("Custom setup"); update({ attackers: state.attackers.map((x, j) => (j === i ? p : x)) }); }} />
+            ))}
+            <PointInput label="Ball (goal frame, m)" value={state.ball} xMin={0.01} xMax={GOAL_W - 0.01} yMin={0.01} yMax={GOAL_H - 0.01} step={0.05} digits={2} onChange={(ball) => update({ ball })} />
+            <PointInput label="Keeper (goal frame, m)" value={state.gkf} xMin={0.5} xMax={GOAL_W - 0.5} yMin={0} yMax={1.5} step={0.05} digits={2} onChange={(gkf) => update({ gkf })} />
+          </div>}
           {view === "retrain" && <div className="training-card open">
             <div className="panel-row-title">
               <div className="fk-title">Retrain model</div>
@@ -527,6 +578,15 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               <button className="btn" onClick={downloadCsvTemplate}>CSV template</button>
               <button className="btn" onClick={resetDefaultModel}>Reset model</button>
             </div>
+            <div className="fk-title">Batch score shots</div>
+            <label>Shots CSV (scored with the active calibration)
+              <input type="file" accept=".csv,text/csv" onChange={scoreCsvFile} />
+            </label>
+            <div className="tool-row">
+              <button className="btn" style={{ gridColumn: "1 / -1" }} onClick={downloadBatchTemplate}>Batch CSV template</button>
+            </div>
+            {batchReport && "error" in batchReport && <Row k="Batch scoring" v={batchReport.error} />}
+            {batchReport && !("error" in batchReport) && <Row k="Batch scoring" v={`${batchReport.scored} scored, ${batchReport.skipped} skipped -> file downloaded`} />}
             <div className="scenario-actions">
               <button className="btn" onClick={() => applyTrainedModel()} disabled={!selectedModelId}>Apply</button>
               <button className="btn" onClick={exportTrainedModel} disabled={!selectedModelId}>Export</button>

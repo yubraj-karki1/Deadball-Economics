@@ -390,11 +390,55 @@ a:focus-visible {
 .training-card,
 .direct-fk-card,
 .fk-wall-card,
-.formula-live {
+.formula-live,
+.coords-card {
   padding: 11px;
   border-radius: 8px;
   border: 1px solid rgba(224, 184, 74, 0.13);
   background: rgba(10, 18, 13, 0.76);
+}
+
+.coords-card {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.point-input {
+  display: grid;
+  gap: 4px;
+}
+
+.point-input > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.point-input-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.point-input-row label {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.point-input-row input[type=number] {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--ink);
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .mini-card {
