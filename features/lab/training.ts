@@ -3,11 +3,12 @@ import { DEFAULT_CALIBRATION, GOAL_H, GOAL_W, P_L, P_W } from "./constants";
 import { fmt } from "./calculations";
 import { calcPhysics } from "./physics";
 import { makeScenarioId } from "./storage";
-import type { DataQuality, FeatureImportance, ModelConfidence, PsxgTraining, SkipReason, TrainedModel, TrainingMetrics, TrainingReport, TrainingRow } from "./types";
+import type { DataQuality, FeatureImportance, ModelConfidence, PsxgTraining, ReliabilityBucket, SkipReason, TrainedModel, TrainingMetrics, TrainingReport, TrainingRow } from "./types";
 import { distM, pct } from "./utils";
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const sigmoid = (v: number) => 1 / (1 + Math.exp(-v));
+const round4 = (v: number) => Math.round(v * 10000) / 10000;
 
 function parseCsvLine(line: string) {
   const cells: string[] = [];
@@ -173,6 +174,30 @@ function trainingMetrics(rows: TrainingRow[], weights: number[]): TrainingMetric
   };
 }
 
+function reliabilityCurve(rows: TrainingRow[], weights: number[], targetBins = 8): ReliabilityBucket[] {
+  if (rows.length < 6) return [];
+  const bins = Math.max(1, Math.min(targetBins, Math.floor(rows.length / 3)));
+  const scored = rows
+    .map((row) => ({ goal: row.goal, p: predictTrainingRow(weights, row.features) }))
+    .sort((a, b) => a.p - b.p);
+  const size = Math.ceil(scored.length / bins);
+  const buckets: ReliabilityBucket[] = [];
+
+  for (let i = 0; i < scored.length; i += size) {
+    const slice = scored.slice(i, i + size);
+    if (!slice.length) continue;
+    buckets.push({
+      count: slice.length,
+      avgPredicted: round4(slice.reduce((sum, s) => sum + s.p, 0) / slice.length),
+      avgActual: round4(slice.reduce((sum, s) => sum + s.goal, 0) / slice.length),
+      minP: round4(slice[0].p),
+      maxP: round4(slice[slice.length - 1].p),
+    });
+  }
+
+  return buckets;
+}
+
 const TRAINING_FEATURES = [
   { name: "distance", label: "Distance", direction: "closer shots" },
   { name: "angle", label: "Angle", direction: "central angle" },
@@ -283,10 +308,12 @@ export function trainCalibrationFromCsv(text: string, name: string): TrainingRep
   }
 
   const train = trainingMetrics(trainRows, weights);
-  const test = trainingMetrics(testRows.length ? testRows : trainRows, weights);
+  const evalRows = testRows.length ? testRows : trainRows;
+  const test = trainingMetrics(evalRows, weights);
   const psxg = psxgTrainingFromCsv(parsedRows);
   const confidence = modelConfidence(train, test, quality);
   const warnings = modelWarnings(train, test, quality, psxg);
+  const reliability = reliabilityCurve(evalRows, weights);
   const goals = rows.reduce((sum, row) => sum + row.goal, 0);
 
   const calibration: Required<ModelCalibration> = {
@@ -312,9 +339,10 @@ export function trainCalibrationFromCsv(text: string, name: string): TrainingRep
     confidence,
     warnings,
     psxg,
+    reliability,
     notes: "",
     createdAt: Date.now(),
   };
 
-  return { rows: rows.length, skipped: quality.skipped, quality, train, test, confidence, warnings, model };
+  return { rows: rows.length, skipped: quality.skipped, quality, train, test, confidence, warnings, reliability, model };
 }

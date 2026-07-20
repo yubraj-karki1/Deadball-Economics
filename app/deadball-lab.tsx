@@ -5,6 +5,7 @@ import { ACTIVE_TRAINED_MODEL_KEY, DEFAULT_CALIBRATION, GK_H, GK_V, GOAL_H, GOAL
 import { directFreeKickVisual, fmt, signed, xgMath } from "../features/lab/calculations";
 import { GoalkeeperFigure, PitchMarks, Player, Voronoi, zoneFill } from "../features/lab/pitch-components";
 import { recommendationFor } from "../features/lab/recommendations";
+import { ReliabilityChart } from "../features/lab/reliability-chart";
 import { Card, Legend, Metric, Row, Slider } from "../features/lab/ui-components";
 import { calcPhysics, footAdjustedCurve, goalPointToSvg, swingPath } from "../features/lab/physics";
 import { calibrationOr, makeScenarioId, numberOr, readSavedScenarios, readTrainedModels, writeSavedScenarios, writeTrainedModels } from "../features/lab/storage";
@@ -565,6 +566,10 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               ))}
               {selectedTrainedModel?.psxg && <Row k="PSxG training" v={`${selectedTrainedModel.psxg.rows} rows, GK reaction ${fmt(selectedTrainedModel.psxg.suggestedGkReaction, 2)}x`} />}
               {retrainWarnings.length > 0 && <Row k="Warnings" v={retrainWarnings.join(", ")} />}
+              {selectedTrainedModel?.reliability && selectedTrainedModel.reliability.length > 0 && <>
+                <div className="fk-title">Reliability (selected model, test set)</div>
+                <ReliabilityChart buckets={selectedTrainedModel.reliability} />
+              </>}
               {trainingReport && "error" in trainingReport && <Row k="Training" v={trainingReport.error} />}
               {trainingReport && !("error" in trainingReport) && <>
                 <Row k="Rows / skipped" v={`${trainingReport.rows} / ${trainingReport.skipped}`} />
@@ -575,6 +580,10 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
                 <Row k="Test accuracy / AUC" v={`${pct(trainingReport.test.accuracy)} / ${fmt(trainingReport.test.auc)}`} />
                 <Row k="New confidence" v={`${trainingReport.confidence.label} (${trainingReport.confidence.score}/100)`} />
                 {trainingReport.warnings.length > 0 && <Row k="New warnings" v={trainingReport.warnings.join(", ")} />}
+                {trainingReport.reliability.length > 0 && <>
+                  <div className="fk-title">Reliability (just-trained model, test set)</div>
+                  <ReliabilityChart buckets={trainingReport.reliability} />
+                </>}
               </>}
             </div>
           </div>}

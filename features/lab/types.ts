@@ -36,6 +36,7 @@ export type DataQuality = { total: number; valid: number; skipped: number; missi
 export type FeatureImportance = { name: string; label: string; weight: number; share: number; direction: string };
 export type ModelConfidence = { label: "Low" | "Medium" | "High"; score: number; reasons: string[] };
 export type PsxgTraining = { rows: number; predicted: number; actual: number; suggestedGkReaction: number };
+export type ReliabilityBucket = { count: number; avgPredicted: number; avgActual: number; minP: number; maxP: number };
 
 export type TrainedModel = {
   id: string;
@@ -53,11 +54,12 @@ export type TrainedModel = {
   confidence?: ModelConfidence;
   warnings?: string[];
   psxg?: PsxgTraining;
+  reliability?: ReliabilityBucket[];
   notes?: string;
   createdAt: number;
 };
 
-export type TrainingReport = { rows: number; skipped: number; quality: DataQuality; train: TrainingMetrics; test: TrainingMetrics; confidence: ModelConfidence; warnings: string[]; model: TrainedModel } | { error: string };
+export type TrainingReport = { rows: number; skipped: number; quality: DataQuality; train: TrainingMetrics; test: TrainingMetrics; confidence: ModelConfidence; warnings: string[]; reliability: ReliabilityBucket[]; model: TrainedModel } | { error: string };
 
 export type PsxgCalc = {
   psxg: number;

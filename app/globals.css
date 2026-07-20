@@ -407,6 +407,17 @@ a:focus-visible {
   gap: 8px;
 }
 
+.reliability-chart {
+  display: grid;
+  gap: 8px;
+}
+
+.reliability-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .panel-row-title {
   display: flex;
   align-items: center;
