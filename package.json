@@ -1,5 +1,5 @@
 {
-  "name": "deadball-economics-next",
+  "name": "tactiset",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -19,6 +19,8 @@
     "@types/node": "^22.13.14",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
+    "eslint": "^9.23.0",
+    "eslint-config-next": "^15.4.1",
     "typescript": "^5.8.2",
     "vitest": "^4.1.10"
   }

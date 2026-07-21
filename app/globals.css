@@ -69,7 +69,7 @@ h1 {
   background: var(--deep);
   color: #241706;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
   vertical-align: middle;
 }
 
@@ -113,14 +113,31 @@ h1 {
 
 .preset,
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 38px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   color: var(--ink);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 700;
   cursor: pointer;
+}
+
+.preset,
+.btn,
+.mini-btn,
+.health,
+.scenario-link,
+select,
+input[type=text],
+input[type=file]::file-selector-button,
+input[type=number],
+textarea {
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 100ms ease, filter 150ms ease, box-shadow 150ms ease;
 }
 
 .preset {
@@ -139,10 +156,27 @@ h1 {
 
 .preset:hover,
 .preset.on,
-.btn.toggle.on {
+.btn.toggle.on,
+.btn.primary {
   background: var(--deep);
   border-color: var(--deep);
   color: #241706;
+}
+
+.preset:hover,
+.btn:hover:not(:disabled),
+.mini-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.btn:active:not(:disabled),
+.preset:active,
+.mini-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn.primary {
+  border-color: var(--deep);
 }
 
 .grid {
@@ -229,12 +263,13 @@ h1 {
 .calculation-hero small {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 600;
 }
 
 .calculation-hero b {
   color: var(--deep);
   font-size: clamp(44px, 6vw, 72px);
+  font-weight: 900;
   line-height: 1;
 }
 
@@ -262,7 +297,7 @@ h1 {
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .panel-head b {
@@ -287,7 +322,7 @@ label {
   gap: 5px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 select,
@@ -307,7 +342,7 @@ select {
   color: var(--ink);
   padding: 0 10px;
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 600;
 }
 
 input[type=text] {
@@ -318,7 +353,7 @@ input[type=text] {
   color: var(--ink);
   padding: 0 10px;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 input[type=file] {
@@ -329,7 +364,26 @@ input[type=file] {
   color: var(--muted);
   padding: 7px 9px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
+}
+
+input[type=file]::file-selector-button {
+  margin-right: 10px;
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+input[type=file]::file-selector-button:hover {
+  background: var(--deep);
+  border-color: var(--deep);
+  color: #241706;
 }
 
 textarea {
@@ -342,7 +396,7 @@ textarea {
   color: var(--text);
   padding: 9px 10px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
   line-height: 1.35;
 }
 
@@ -375,7 +429,9 @@ a:focus-visible {
 }
 
 .btn.danger {
-  border-color: rgba(239, 91, 91, 0.42);
+  border-color: rgba(239, 91, 91, 0.45);
+  background: rgba(239, 91, 91, 0.1);
+  color: #ffb4b4;
 }
 
 .btn.danger:hover:not(:disabled) {
@@ -413,7 +469,7 @@ a:focus-visible {
 .point-input > span {
   color: var(--muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .point-input-row {
@@ -438,7 +494,7 @@ a:focus-visible {
   color: var(--ink);
   padding: 0 8px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .mini-card {
@@ -481,7 +537,7 @@ a:focus-visible {
   background: rgba(224, 184, 74, 0.08);
   color: #f7ecd0;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -500,7 +556,7 @@ a:focus-visible {
   margin-bottom: 8px;
   color: #f7ecd0;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 700;
 }
 
 .pitchpanel,
@@ -600,7 +656,7 @@ a:focus-visible {
 .k {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .formula-live {
@@ -639,7 +695,7 @@ a:focus-visible {
   margin-top: 6px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .math-card {
@@ -652,8 +708,9 @@ a:focus-visible {
   border-radius: 8px;
   background: rgba(224, 184, 74, 0.08);
   color: #f7ecd0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }

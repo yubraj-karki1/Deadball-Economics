@@ -6,7 +6,7 @@ import { directFreeKickVisual, fmt, signed, xgMath } from "../features/lab/calcu
 import { GoalkeeperFigure, PitchMarks, Player, Voronoi, zoneFill } from "../features/lab/pitch-components";
 import { recommendationFor } from "../features/lab/recommendations";
 import { ReliabilityChart } from "../features/lab/reliability-chart";
-import { Card, Legend, Metric, PointInput, Row, Slider } from "../features/lab/ui-components";
+import { Card, IconCheck, IconDownload, IconSave, IconTrash, Legend, Metric, PointInput, Row, Slider } from "../features/lab/ui-components";
 import { calcPhysics, footAdjustedCurve, goalPointToSvg, swingPath } from "../features/lab/physics";
 import { calibrationOr, makeScenarioId, numberOr, readSavedScenarios, readTrainedModels, writeSavedScenarios, writeTrainedModels } from "../features/lab/storage";
 import { modelConfidence, trainCalibrationFromCsv } from "../features/lab/training";
@@ -539,9 +539,9 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               <input type="text" value={saveName} maxLength={64} onChange={(e) => setSaveName(e.target.value)} />
             </label>
             <div className="scenario-actions">
-              <button className="btn" onClick={saveScenario}>Save</button>
+              <button className="btn primary" onClick={saveScenario}><IconSave />Save</button>
               <button className="btn" onClick={loadScenario} disabled={!selectedSavedId}>Load</button>
-              <button className="btn danger" onClick={deleteScenario} disabled={!selectedSavedId}>Delete</button>
+              <button className="btn danger" onClick={deleteScenario} disabled={!selectedSavedId}><IconTrash />Delete</button>
             </div>
             <label>Saved setups
               <select value={selectedSavedId} onChange={(e) => {
@@ -627,7 +627,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               <input type="file" accept=".json,application/json" onChange={importTrainedModel} />
             </label>
             <div className="tool-row">
-              <button className="btn" onClick={downloadCsvTemplate}>CSV template</button>
+              <button className="btn" onClick={downloadCsvTemplate}><IconDownload />CSV template</button>
               <button className="btn" onClick={resetDefaultModel}>Reset model</button>
             </div>
             <div className="fk-title">Batch score shots</div>
@@ -635,14 +635,14 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
               <input type="file" accept=".csv,text/csv" onChange={scoreCsvFile} />
             </label>
             <div className="tool-row">
-              <button className="btn" style={{ gridColumn: "1 / -1" }} onClick={downloadBatchTemplate}>Batch CSV template</button>
+              <button className="btn" style={{ gridColumn: "1 / -1" }} onClick={downloadBatchTemplate}><IconDownload />Batch CSV template</button>
             </div>
             {batchReport && "error" in batchReport && <Row k="Batch scoring" v={batchReport.error} />}
             {batchReport && !("error" in batchReport) && <Row k="Batch scoring" v={`${batchReport.scored} scored, ${batchReport.skipped} skipped -> file downloaded`} />}
             <div className="scenario-actions">
-              <button className="btn" onClick={() => applyTrainedModel()} disabled={!selectedModelId}>Apply</button>
-              <button className="btn" onClick={exportTrainedModel} disabled={!selectedModelId}>Export</button>
-              <button className="btn danger" onClick={deleteTrainedModel} disabled={!selectedModelId}>Delete</button>
+              <button className="btn primary" onClick={() => applyTrainedModel()} disabled={!selectedModelId}><IconCheck />Apply</button>
+              <button className="btn" onClick={exportTrainedModel} disabled={!selectedModelId}><IconDownload />Export</button>
+              <button className="btn danger" onClick={deleteTrainedModel} disabled={!selectedModelId}><IconTrash />Delete</button>
             </div>
             <label>Trained models
               <select value={selectedModelId} onChange={(e) => {
@@ -725,7 +725,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
             {flightPoint && <circle cx={flightPoint.x} cy={flightPoint.y} r="0.55" fill="#f7ecd0" stroke="#241706" strokeWidth="0.18" />}
           </svg>
           {view !== "calculations" && <div className="tool-row flight-controls">
-            <button className="btn" style={{ gridColumn: "1 / -1" }} onClick={playDelivery} disabled={flightProgress !== null}>{flightProgress !== null ? "Playing delivery…" : "▶ Play delivery"}</button>
+            <button className="btn primary" style={{ gridColumn: "1 / -1" }} onClick={playDelivery} disabled={flightProgress !== null}>{flightProgress !== null ? "Playing delivery…" : "▶ Play delivery"}</button>
           </div>}
           <div className="legend"><Legend color="#f7ecd0" text="Shot" /><Legend color="#e0b84a" text="Delivery / GK" /><Legend color="#ef5b5b" text="Defenders" /><Legend color="#4fd0a5" text="Attackers" /><Legend color="#e08a3c" text="Wall" /></div>
           {view === "calculations" && <div className="pitch-math-grid">
