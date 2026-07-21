@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #0a1410;
   --ink: #f3f6f1;
   --muted: #9db4a4;
@@ -456,20 +457,25 @@ a:focus-visible {
 
 .coords-card {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   max-height: 360px;
   overflow: auto;
+  flex-shrink: 0;
 }
 
 .point-input {
   display: grid;
-  gap: 4px;
+  gap: 6px;
+  padding: 9px 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(224, 184, 74, 0.16);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .point-input > span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
+  color: var(--cream);
+  font-size: 11.5px;
+  font-weight: 700;
 }
 
 .point-input-row {
@@ -483,6 +489,8 @@ a:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+  color: #c3d3c9;
+  font-weight: 700;
 }
 
 .point-input-row input[type=number] {
@@ -796,5 +804,119 @@ a:focus-visible {
 
   .retrain-view > .cards .insight {
     grid-column: auto;
+  }
+}
+
+.print-report { display: none; }
+
+@media print {
+  @page { margin: 12mm; }
+
+  body { padding: 0; background: #fff; }
+
+  .app-shell { display: none !important; }
+
+  .print-report {
+    display: block;
+    background: #fff;
+    color: #12181c;
+  }
+
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 2px solid #12181c;
+    padding-bottom: 10px;
+    margin-bottom: 14px;
+  }
+
+  .print-header h1 {
+    font-size: 22px;
+    color: #12181c;
+  }
+
+  .print-meta {
+    display: flex;
+    gap: 14px;
+    font-size: 12px;
+    color: #4a5a52;
+  }
+
+  .print-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 280px) 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+    align-items: start;
+  }
+
+  .print-pitch svg,
+  .print-goal svg {
+    width: 100%;
+    height: auto;
+    display: block;
+    border: 1px solid #12181c;
+    border-radius: 4px;
+  }
+
+  .print-caption {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #5c6b63;
+    text-align: center;
+  }
+
+  .print-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .print-metric {
+    border: 1px solid #cfd8d3;
+    border-radius: 6px;
+    padding: 8px 10px;
+  }
+
+  .print-metric span {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #5c6b63;
+    margin-bottom: 3px;
+  }
+
+  .print-metric b {
+    font-size: 16px;
+    color: #12181c;
+  }
+
+  .print-note {
+    border: 1px solid #cfd8d3;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 12px;
+  }
+
+  .print-note-title {
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    color: #5c6b63;
+  }
+
+  .print-note p {
+    margin: 0;
+    line-height: 1.5;
+    color: #12181c;
+  }
+
+  .print-footer {
+    font-size: 10px;
+    color: #8a948e;
+    text-align: center;
   }
 }

@@ -6,7 +6,7 @@ import { directFreeKickVisual, fmt, signed, xgMath } from "../features/lab/calcu
 import { GoalkeeperFigure, PitchMarks, Player, Voronoi, zoneFill } from "../features/lab/pitch-components";
 import { recommendationFor } from "../features/lab/recommendations";
 import { ReliabilityChart } from "../features/lab/reliability-chart";
-import { Card, IconCheck, IconDownload, IconSave, IconTrash, Legend, Metric, PointInput, Row, Slider } from "../features/lab/ui-components";
+import { Card, IconCheck, IconDownload, IconPrinter, IconSave, IconTrash, Legend, Metric, PointInput, Row, Slider } from "../features/lab/ui-components";
 import { calcPhysics, footAdjustedCurve, goalPointToSvg, swingPath } from "../features/lab/physics";
 import { calibrationOr, makeScenarioId, numberOr, readSavedScenarios, readTrainedModels, writeSavedScenarios, writeTrainedModels } from "../features/lab/storage";
 import { modelConfidence, trainCalibrationFromCsv } from "../features/lab/training";
@@ -44,6 +44,12 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
   const goalRef = useRef<SVGSVGElement | null>(null);
   const flightPathRef = useRef<SVGPathElement | null>(null);
   const flightRafRef = useRef<number | null>(null);
+  const printMetaRef = useRef<HTMLSpanElement | null>(null);
+
+  const printReport = () => {
+    if (printMetaRef.current) printMetaRef.current.textContent = new Date().toLocaleString();
+    window.print();
+  };
 
   const isDirect = state.spType === "freekick-direct";
   const isFreeKick = state.spType.startsWith("freekick");
@@ -508,6 +514,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
 
   return (
     <>
+      <div className="app-shell">
       <header className="topbar">
         <div>
           <h1>TactiSet <span className="tag">Set-piece xG</span></h1>
@@ -517,6 +524,7 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
           <span className="model-pill">36,055 source shots</span>
           {view !== "lab" && <a className="health" href="/">Back to lab</a>}
           <a className="health" href="/api/health" target="_blank">API health</a>
+          <button className="btn" onClick={printReport}><IconPrinter />Print report</button>
         </div>
       </header>
 
@@ -804,7 +812,69 @@ export default function DeadballLab({ view = "lab" }: { view?: "lab" | "retrain"
           <div className="card small insight"><div className="bk-title">Analyst note</div><div>{recommendation}</div></div>
         </aside>
       </main>
+      </div>
 
+      <section className="print-report">
+        <header className="print-header">
+          <h1>TactiSet report</h1>
+          <div className="print-meta">
+            <span>{scenarioName}</span>
+            <span ref={printMetaRef} />
+          </div>
+        </header>
+
+        <div className="print-grid">
+          <div className="print-pitch">
+            <svg viewBox="55 0 50 68" preserveAspectRatio="xMidYMid meet" className="pitch">
+              <PitchMarks />
+              <path d={shotPath} fill="none" stroke="#e0b84a" strokeWidth="0.48" strokeDasharray="1.2 0.8" />
+              {state.attackers.map((a, i) => <Player key={`pa${i}`} p={a} color="#4fd0a5" />)}
+              {state.defenders.map((d, i) => <Player key={`pd${i}`} p={d} color="#ef5b5b" />)}
+              {wallPlayers.map((d, i) => <g key={`pw${i}`}><Player p={d} color="#e08a3c" /><text x={d[0]} y={d[1] + 0.34} textAnchor="middle" fontSize="0.82" fill="#241706" fontWeight="bold">W</text></g>)}
+              <Player p={state.gk} color="#e0b84a" label="GK" />
+              <Player p={state.start} color="#e0b84a" radius={0.8} />
+              {!isDirect ? <>
+                <line x1={state.shot[0]} y1={state.shot[1]} x2={GX} y2={GY} stroke="#ffffffaa" strokeWidth="0.25" strokeDasharray="1.2 0.8" />
+                <Player p={state.shot} color="#fff" radius={1.12} />
+              </> : <circle cx={directTarget[0]} cy={directTarget[1]} r="0.45" fill="#fff" stroke="#111" strokeWidth="0.2" />}
+            </svg>
+            <div className="print-caption">Pitch setup - {scenarioName}</div>
+          </div>
+          <div className="print-goal">
+            <svg viewBox="0 0 764 280" className="goalframe">
+              <rect x="11" y="11" width="742" height="254" fill="none" stroke="#fff" strokeWidth="8" rx="2" />
+              <rect x="16" y="16" width="732" height="244" fill="rgba(18,92,51,.42)" />
+              {Array.from({ length: 4 }).map((_, c) => Array.from({ length: 3 }).map((__, r) => {
+                const x = (c + 0.5) * GOAL_W / 4;
+                const y = GOAL_H - (r + 0.5) * GOAL_H / 3;
+                const v = calcPhysics([x, y], state.gkf, state.shotSpeed, distM(modelShot), craftBonus, state.calibration).psxg;
+                return <g key={`p${c}-${r}`}><rect x={16 + c * 183} y={16 + r * 81.33} width="183" height="81.33" fill={zoneFill(v)} stroke="rgba(255,255,255,.25)" /><text x={16 + c * 183 + 91.5} y={16 + r * 81.33 + 44} textAnchor="middle" fill="#fff" fontSize="18" fontWeight="bold">{v.toFixed(2)}</text></g>;
+              }))}
+              <GoalkeeperFigure x={gkSvgX} y={gkSvgY} targetX={ballSvgX} targetY={ballSvgY} onPointerDown={() => {}} />
+              <circle cx={ballSvgX} cy={ballSvgY} r="16" fill="#fff" stroke="#333" strokeWidth="2" />
+            </svg>
+            <div className="print-caption">Post-shot xG grid</div>
+          </div>
+        </div>
+
+        <div className="print-metrics">
+          <div className="print-metric"><span>Shot xG</span><b>{pct(result?.xg)}</b></div>
+          <div className="print-metric"><span>Set-piece value</span><b>{pct(result?.setpiece_value)}</b></div>
+          <div className="print-metric"><span>Combined (xG x PSxG)</span><b>{pct(combined)}</b></div>
+          <div className="print-metric"><span>PSxG</span><b>{pct(psxg.psxg)}</b></div>
+          <div className="print-metric"><span>Zone</span><b>{result?.zone ?? "-"}</b></div>
+          <div className="print-metric"><span>Distance</span><b>{(result?.distance_to_goal ?? distM(modelShot)).toFixed(1)} m</b></div>
+          <div className="print-metric"><span>Marking</span><b>{result?.marking_label || "-"}</b></div>
+          <div className="print-metric"><span>Difficulty</span><b>{psxg.diff}</b></div>
+        </div>
+
+        <div className="print-note">
+          <div className="print-note-title">Analyst note</div>
+          <p>{recommendation}</p>
+        </div>
+
+        <div className="print-footer">Generated by TactiSet - tactical set-piece xG lab</div>
+      </section>
     </>
   );
 }
